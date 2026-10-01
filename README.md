@@ -18,6 +18,16 @@ mvn test            # API, 로그인/권한, 실시간 구독 테스트
 
 사내망이라 Maven Central에 못 붙는 경우: 사내 Nexus/Artifactory 주소를 `~/.m2/settings.xml` 의 `<mirror>` 로 설정해야 합니다. (평소 쓰시는 프로젝트의 settings.xml 을 그대로 쓰면 됩니다.)
 
+## 무료 배포(Render)
+
+이 저장소에는 Render 무료 Web Service용 `Dockerfile`과 `render.yaml`이 포함되어 있습니다.
+
+1. GitHub 저장소를 Render에 연결하고 `Blueprint`로 이 저장소를 선택합니다.
+2. `render.yaml`의 서비스가 생성되면 무료 플랜으로 배포합니다.
+3. 배포가 끝나면 Render가 제공하는 `onrender.com` 주소로 접속합니다.
+
+무료 플랜은 사용하지 않을 때 절전 상태가 되어 첫 접속이 느릴 수 있습니다. 현재 기본 DB는 컨테이너 내부의 H2 파일 DB이므로 재배포·인스턴스 재생성 시 계정과 데이터가 초기화될 수 있습니다. 실제 운영 데이터가 필요하면 H2 대신 외부 PostgreSQL 또는 Oracle을 연결해야 합니다.
+
 ## 폴더
 
 ```
