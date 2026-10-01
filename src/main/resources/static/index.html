@@ -1,0 +1,193 @@
+<!-- 로그인·회원가입 화면과 멀티버스 보드의 전체 화면 구조를 제공합니다. -->
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>멀티버스 닉네임판</title>
+<link rel="stylesheet" href="css/style.css?v=20261001-6">
+<script>
+/* 첫 화면이 깜빡이지 않도록 색상 모드와 전장 테마를 먼저 적용 */
+(function () {
+  var t = "", world = "";
+  try { t = localStorage.getItem("ops-theme") || ""; } catch (e) {}
+  try { world = localStorage.getItem("ops-world-theme") || ""; } catch (e) {}
+  document.documentElement.setAttribute("data-ops-theme", t === "light" ? "light" : "dark");
+  document.documentElement.setAttribute("data-world-theme", world === "space" ? "space" : "battlefield");
+})();
+</script>
+</head>
+<body>
+<main class="auth-screen" id="auth-screen" aria-labelledby="auth-title">
+  <section class="auth-panel">
+    <div class="auth-mark" aria-hidden="true"><span>H</span><i></i></div>
+    <p class="auth-eyebrow" id="auth-eyebrow">MULTIVERSE ACCESS</p>
+    <h1 id="auth-title">멀티버스로 돌아오세요</h1>
+    <p class="auth-copy" id="auth-copy">아이디로 접속하고, 당신의 캐릭터로 멀티버스에 합류하세요.</p>
+    <div class="auth-switch" id="auth-switch" role="group" aria-label="계정 메뉴">
+      <button type="button" data-auth-stage="login" aria-label="로그인">로그인</button>
+      <button type="button" data-auth-stage="register" aria-label="회원가입">회원가입</button>
+    </div>
+    <form id="login-form" class="auth-form">
+      <label>아이디<input id="login-username" name="username" type="text" minlength="3" maxlength="30" autocomplete="username" required></label>
+      <label>비밀번호<input id="login-password" name="password" type="password" autocomplete="current-password" required></label>
+      <button class="auth-submit" type="submit">로그인</button>
+    </form>
+    <form id="register-form" class="auth-form" hidden>
+      <label>아이디<input id="register-username" name="username" type="text" minlength="3" maxlength="30" pattern="[A-Za-z0-9_\-]{3,30}" autocomplete="username" required><small id="register-username-status" class="field-status" aria-live="polite"></small></label>
+      <label>비밀번호<input id="register-password" name="new-password" type="password" minlength="4" maxlength="72" autocomplete="new-password" required></label>
+      <button class="auth-submit" type="submit">계정 만들기</button>
+    </form>
+    <form id="character-form" class="auth-form" hidden>
+      <label>캐릭터 이름<input id="character-name" name="character-name" type="text" maxlength="30" autocomplete="off" required></label>
+      <div class="auth-fields">
+        <label>성별<select id="character-gender" name="gender"><option value="f">여성</option><option value="m">남성</option></select></label>
+        <label>유니버스<select id="character-universe" name="universe"><option value="member">프론트 회원</option><option value="order">프론트 주문</option><option value="display">프론트 전시</option><option value="broadcast">프론트 알림</option><option value="curation">프론트 큐레이션</option><option value="fgen">프론트</option><option value="bord">백오피스 주문</option><option value="bprod">백오피스 상품</option><option value="blog">백오피스 물류</option><option value="bsettle">백오피스 정산</option><option value="bgen">백오피스</option></select></label>
+      </div>
+      <button class="auth-submit" type="submit">캐릭터 만들기</button>
+    </form>
+    <p class="auth-status" id="auth-status" role="status" aria-live="polite"></p>
+    <p class="auth-demo">관리자 데모 계정 <b>admin</b> / <b>admin</b></p>
+  </section>
+</main>
+
+<div class="wrap" hidden>
+  <header>
+    <div class="hrow"><div class="eyebrow">Multiverse</div><div class="theme-controls"><div class="sides themebar" id="themebar" role="group" aria-label="화면 모드"><button type="button" class="side" data-t="dark" aria-pressed="true">다크</button><button type="button" class="side" data-t="light" aria-pressed="false">라이트</button></div><div class="sides worldthemebar" id="world-themebar" role="group" aria-label="전장 테마"><button type="button" class="side" data-world-theme="battlefield" aria-pressed="true">전장</button><button type="button" class="side" data-world-theme="space" aria-pressed="false">우주</button></div></div></div>
+    <h1><em>멀티버스</em></h1>
+    <p class="lede">프론트와 백오피스, 두 개의 차원에서 <span id="total"></span>명의 영웅이 서비스를 지킵니다. 차원과 유니버스를 고르거나 이름과 스킬로 검색해서 동료를 만나보세요.</p>
+    <div class="accountbar"><span id="account-name"></span><button type="button" id="logout-button" aria-label="로그아웃">로그아웃</button></div>
+  </header>
+
+  <nav class="gnav" id="views" aria-label="메뉴">
+    <div class="ngrp"><button type="button" class="nb" data-v="map" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 12 3.5 6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span>전장</span></button></div>
+    <div class="ngrp"><span class="nlab">영웅</span><button type="button" class="nb" data-v="list" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.3 2.8-5 5.5-5s4.9 1.7 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.4.1 4 1.5 4.5 4.3"/></svg><span>영웅 명부</span></button><button type="button" class="nb" data-v="team" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.4"/><path d="M4 19.5c.6-3.6 3-5.5 6-5.5s5.4 1.9 6 5.5"/><path d="M18.5 5v6M15.5 8h6"/></svg><span>영웅 모집</span></button></div>
+    <div class="ngrp"><span class="nlab">군영</span><button type="button" class="nb" data-v="meet" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg><span>작전 회의</span></button><button type="button" class="nb" data-v="proj" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>용병단</span></button><button type="button" class="nb" data-v="snack" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5v2.5M11.5 3.5v2.5"/></svg><span>보급</span></button><button type="button" class="nb" data-v="chat" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5a2.5 2.5 0 0 1 2.5-2.5h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 3.5V17h0A2.5 2.5 0 0 1 4 14.5z"/></svg><span>전령</span><b id="cbadge" class="cbadge" hidden></b></button></div>
+  </nav>
+  <div class="toprow">
+    <div class="sides" id="sides" role="group" aria-label="차원 선택"></div>
+  </div>
+  <section class="portals" id="portals" aria-label="유니버스 선택"></section>
+
+  <div class="toolbar" id="toolbar">
+    <button class="chip-all" id="all" type="button" aria-pressed="true">전체 보기</button>
+    <input id="q" type="search" placeholder="이름, 직업, 스킬 검색" aria-label="캐릭터 검색" autocomplete="off">
+    <select id="sort" aria-label="정렬">
+      <option value="lv">레벨 높은 순</option>
+      <option value="pow">전투력 높은 순</option>
+      <option value="name">이름 순</option>
+    </select>
+    <span class="count" id="count" aria-live="polite"></span>
+  </div>
+
+  <section class="world" id="world" aria-label="전장">
+    <div class="worldscroll">
+      <div class="worldbox" id="worldbox">
+        <canvas id="map" width="1200" height="970" role="img" aria-label="멀티버스 전장. 영웅 캐릭터가 전장을 돌아다니고, 오른쪽에는 작전 막사, 아래쪽에는 용병 진영이 있습니다. 같은 정보는 영웅 명부에서도 볼 수 있습니다."></canvas>
+        <div class="tip" id="tip" hidden></div>
+      </div>
+    </div>
+    <div class="wcontrols">
+      <label><input type="checkbox" id="names" checked> 이름 표시</label>
+      <label><input type="checkbox" id="autolunch" checked> 점심시간 자동</label>
+      <span class="cfgline">점심 <input type="time" id="cfgls" value="12:00" aria-label="점심 시작"> ~ <input type="time" id="cfgle" value="13:00" aria-label="점심 끝"> · 퇴근 <input type="time" id="cfgoe" value="18:00" aria-label="퇴근 시간"> <span class="jstatus" id="cfgst" role="status"></span></span>
+      <span id="otcount" class="otcount"></span>
+      <div class="legend" id="legend" aria-label="팀별 책상 색"></div>
+      <span>캐릭터를 누르면 캐릭터 시트가 열려요. 빨간 침입자는 팀원이 맡은 미완료 업무이고, 담당자 뒤를 졸졸 따라다니다가 시트에서 완료로 체크하면 사라져요. 점심·휴식·회의 중에는 자리를 비우고, 연차인 캐릭터는 회색으로 멈춰 있어요. 퇴근 시간이 지나면 캐릭터가 흐리게 멈춰 서고, 시트의 「상태」에서 야근을 선택하면 계속 움직여요.</span>
+    </div>
+  </section>
+
+  <section class="pane" id="meetpane" aria-label="작전 회의" hidden>
+    <h2>작전 회의</h2>
+    <p>회의 이름을 적고 함께하는 사람을 고르면, 지도 아래쪽 회의실 테이블에 둘러앉은 모습이 보여요. 회의를 끝내면 다시 자기 자리로 돌아가요. 연차인 사람은 앉지 않고, 한 테이블에 8명까지, 동시에 3개 회의까지 앉을 수 있어요.</p>
+    <div class="pform">
+      <div class="jrow"><input id="mname" type="text" maxlength="30" placeholder="회의 이름 (예: 주간 이슈 점검)" aria-label="회의 이름"><button type="button" id="msave" class="jsave">회의 만들고 시작</button><button type="button" id="mcancelbtn" hidden>수정 취소</button></div>
+      <div class="mlabel" style="margin-top:12px">참석자 <span id="mpc"></span></div>
+      <div id="mpick"></div>
+      <div class="jstatus" id="mstatus" role="status"></div>
+    </div>
+    <div class="mlist" id="mlist"></div>
+  </section>
+
+  <section class="pane" id="projpane" aria-label="용병단" hidden>
+    <h2>용병단</h2>
+    <p>외부에서 프로젝트 팀이 합류하면 팀을 만들고 명단을 추가하세요. 팀마다 지도에 전용 공간이 생기고, 팀 이름은 언제든 바꿀 수 있어요. 최대 3팀까지 만들 수 있어요.</p>
+    <div class="pform">
+      <div class="jrow"><input id="pname" type="text" maxlength="16" placeholder="프로젝트 팀 이름 (예: 차세대 결제 TF)" aria-label="프로젝트 팀 이름"><button type="button" id="padd" class="jsave">프로젝트 팀 만들기</button></div>
+    </div>
+    <div class="jstatus" id="pstatus" role="status"></div>
+    <div class="plist" id="plist"></div>
+  </section>
+
+  <section class="pane" id="snackpane" aria-label="보급 담당" hidden>
+    <h2>보급 담당</h2>
+    <p>이번 기간에 간식을 챙길 팀과 먹을거리를 정해두세요. 기간 안에는 지도의 팀 구역에 먹을거리 아이템이 나타나고, 팀 카드와 팀원 시트에도 표시돼요.</p>
+    <div class="pform">
+      <div class="mlabel">담당팀</div><div class="recs" id="steams"></div>
+      <div class="jrow dates"><label class="dl">시작 <input id="sfrom" type="date"></label><label class="dl">종료 <input id="sto" type="date"></label></div>
+      <div class="mlabel" style="margin-top:12px">먹을거리 <span id="sfc"></span></div>
+      <div class="recs" id="sfoods"></div>
+      <div class="jrow"><input id="sfree" type="text" maxlength="10" placeholder="직접 입력 (예: 마카롱)" aria-label="먹을거리 직접 입력"><button type="button" id="sfreeadd">추가</button></div>
+      <div class="jrow" style="margin-top:10px"><button type="button" id="ssave" class="jsave">간식 당번 등록</button><button type="button" id="scancel" hidden>수정 취소</button></div>
+      <div class="jstatus" id="sstatus" role="status"></div>
+    </div>
+    <div class="mlist" id="slist"></div>
+  </section>
+
+  <section class="pane" id="chatpane" aria-label="채팅" hidden>
+    <h2>공지와 메시지</h2>
+    <div class="chat-modes" id="chat-modes" role="tablist" aria-label="채팅 종류">
+      <button type="button" class="chat-mode" data-chat-mode="notice" role="tab" aria-selected="true">공지</button>
+      <button type="button" class="chat-mode" data-chat-mode="private" role="tab" aria-selected="false">개인·그룹 채팅</button>
+    </div>
+    <section id="notice-pane" class="chatbox" aria-label="공지">
+      <p>공지 내용은 모든 사용자에게 표시됩니다. 팀장·상무급 캐릭터와 관리자만 작성할 수 있습니다.</p>
+      <div class="clist" id="clist" role="log" aria-live="polite"></div>
+      <div class="pform cform">
+        <div class="jrow"><select id="cwho" aria-label="공지 작성 캐릭터"></select><input id="cin" type="text" maxlength="200" placeholder="공지 내용을 입력하세요 (Enter)" aria-label="공지 내용" autocomplete="off"><button type="button" id="csend" class="jsave">공지 등록</button></div>
+        <div class="jstatus" id="cstatus" role="status"></div>
+      </div>
+    </section>
+    <section id="private-pane" class="private-chat" aria-label="개인·그룹 채팅" hidden>
+      <aside class="private-sidebar">
+        <span class="private-recipient-label">새 대화 상대</span>
+        <div id="private-recipients" class="private-recipients" role="group" aria-label="대화 상대 선택"></div>
+        <button type="button" id="private-open">대화 열기</button>
+        <div id="private-rooms" class="private-rooms" aria-label="대화 목록"></div>
+      </aside>
+      <div class="private-conversation">
+        <h3 id="private-title">대화 상대를 선택하세요</h3>
+        <div class="clist" id="private-log" role="log" aria-live="polite"></div>
+        <div class="jrow"><input id="private-input" type="text" maxlength="500" placeholder="메시지를 입력하세요 (Enter)" aria-label="개인 메시지" autocomplete="off"><button type="button" id="private-send" class="jsave">보내기</button></div>
+        <div class="jstatus" id="private-status" role="status"></div>
+      </div>
+      </section>
+  </section>
+
+  <section class="pane" id="teampane" aria-label="멤버" hidden>
+    <h2>영웅 모집</h2>
+    <p>처음에는 불꽃토끼만 있어요. 편집 권한이 있는 사람이 닉네임과 소속(대분류 > 소분류)을 입력해서 멤버를 추가하면 지도와 명단에 나타나요. 소분류, 직급, 직업은 비워 둬도 되고, 나중에 캐릭터 시트에서 바꿀 수 있어요.</p>
+    <p class="tempty" id="teamnote" hidden>이 페이지의 편집 권한이 있는 사람만 멤버를 추가하거나 뺄 수 있어요.</p>
+    <div class="pform" id="teamform">
+      <div class="jrow"><input id="tmname" type="text" maxlength="30" placeholder="닉네임 (필수)" aria-label="닉네임" autocomplete="off"><input id="tmtitle" type="text" maxlength="8" placeholder="직급 (선택)" aria-label="직급" autocomplete="off"><input id="tmjob" type="text" maxlength="16" placeholder="직업 (선택)" aria-label="직업" autocomplete="off"></div>
+      <div class="jrow" style="margin-top:8px"><select id="tmside" aria-label="소속 대분류"></select><select id="tmsub" aria-label="소속 소분류 (선택)"></select><select id="tmg" aria-label="캐릭터 성별"><option value="m">남</option><option value="f">여</option></select><button type="button" id="tmadd" class="jsave">멤버 추가</button></div>
+      <div class="jstatus" id="teamstatus" role="status"></div>
+    </div>
+    <div class="mlabel">현재 멤버 <span id="teamcount"></span></div>
+    <div class="pmem" id="teamlist"></div>
+  </section>
+
+  <main class="grid" id="grid" hidden></main>
+
+  <p class="note">닉네임과 직급은 멤버를 추가할 때 입력하고, 스탯과 레벨은 화면 구성을 위한 임시 설정이며 스탯은 시트의 「스탯」에서 각자 조정할 수 있습니다. 직업과 직급은 캐릭터 시트의 「직업 바꾸기」「직급」에서 바꿀 수 있고, 맡은 업무·근태·전출·자리도 시트에서 관리합니다. 회의, 프로젝트 팀, 간식 담당팀, 채팅, 멤버 추가는 위쪽 탭에서 사용합니다.</p>
+</div>
+
+<div class="veil" id="veil" hidden>
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sname"></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/db-adapter.js"></script>
+<script src="js/app.js?v=20261001-6"></script>
+
+</body></html>

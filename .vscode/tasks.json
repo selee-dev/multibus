@@ -1,0 +1,61 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Maven Clean Test",
+			"type": "shell",
+			"command": "C:\\Users\\hns\\AppData\\Local\\Programs\\APACHE~1\\apache-maven-3.9.16\\bin\\mvn.cmd",
+			"args": [
+				"clean",
+				"-Dtest=DocApiTest",
+				"test"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$javac"
+			],
+			"group": "test"
+		},
+		{
+			"label": "Maven Clean Test",
+			"type": "shell",
+			"command": "C:\\Users\\hns\\AppData\\Local\\Programs\\APACHE~1\\apache-maven-3.9.16\\bin\\mvn.cmd",
+			"args": [
+				"clean",
+				"-Dtest=DocApiTest",
+				"test"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$javac"
+			],
+			"group": "test"
+		},
+		{
+			"label": "Run Hero Board",
+			"type": "shell",
+			"command": "C:\\Users\\hns\\AppData\\Local\\Programs\\APACHE~1\\apache-maven-3.9.16\\bin\\mvn.cmd",
+			"args": [
+				"spring-boot:run"
+			],
+			"isBackground": true,
+			"problemMatcher": [
+				"$javac"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Maven Process Resources",
+			"type": "shell",
+			"command": "C:\\Users\\hns\\AppData\\Local\\Programs\\APACHE~1\\apache-maven-3.9.16\\bin\\mvn.cmd",
+			"args": [
+				"resources:resources"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$javac"
+			],
+			"group": "build"
+		}
+	]
+}

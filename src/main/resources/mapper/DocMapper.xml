@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- HERO_DOC 문서를 조회하고 생성·갱신·삭제하는 MyBatis SQL 매핑입니다. -->
+<mapper namespace="kr.co.herob.board.mapper.DocMapper">
+
+  <resultMap id="docRow" type="kr.co.herob.board.service.DocRow">
+    <constructor>
+      <arg column="COL_NAME" javaType="java.lang.String"/>
+      <arg column="DOC_ID"   javaType="java.lang.String"/>
+      <arg column="BODY"     javaType="java.lang.String"/>
+    </constructor>
+  </resultMap>
+
+  <select id="selectAll" resultMap="docRow">
+    SELECT COL_NAME, DOC_ID, BODY FROM HERO_DOC ORDER BY COL_NAME, DOC_ID
+  </select>
+
+  <select id="selectByCollection" resultMap="docRow">
+    SELECT COL_NAME, DOC_ID, BODY FROM HERO_DOC WHERE COL_NAME = #{col} ORDER BY DOC_ID
+  </select>
+
+  <update id="update">
+    UPDATE HERO_DOC SET BODY = #{body}, UPD_DT = CURRENT_TIMESTAMP
+     WHERE COL_NAME = #{col} AND DOC_ID = #{id}
+  </update>
+
+  <insert id="insert">
+    INSERT INTO HERO_DOC (COL_NAME, DOC_ID, BODY) VALUES (#{col}, #{id}, #{body})
+  </insert>
+
+  <delete id="delete">
+    DELETE FROM HERO_DOC WHERE COL_NAME = #{col} AND DOC_ID = #{id}
+  </delete>
+
+</mapper>

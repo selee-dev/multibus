@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-HeroBoardApplication<hero-board-server>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "kr.co.herob.board.HeroBoardApplication",
+            "projectName": "hero-board-server",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
