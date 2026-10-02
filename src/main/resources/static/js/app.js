@@ -1972,6 +1972,7 @@ function rebuildExternal(first) {
   if (state.side && !DATA.some(function (d) { return UNI[uOf(d)].side === state.side; })) state.side = null;
   paintMap(); applyMoves(!!first); applySeats(!!first);
   document.getElementById("total").textContent = DATA.length;
+  applySiteCopy();
   renderGrid(); syncIntruders(!!first); syncMeetings(!!first);
   if (state.view === "chat") { renderChatWho(); renderChat(); }
   if (openId !== null) { var ni = indexOfId(openId); if (ni < 0) closeSheet(); else openSheet(ni, null); }
@@ -2402,7 +2403,7 @@ document.getElementById("clist").addEventListener("click", function (event) {
   if (button) commit("chat", button.dataset.id, null, function () { renderChat(); updateBadge(); }, "#cstatus");
 });
 
-/* ---- 멤버 화면: 편집 권한이 있는 사람이 입력해서 추가해요 ---- */
+/* ---- 멤버 화면: 관리자가 명단과 계정 캐릭터를 관리해요 ---- */
 var SIDES = [["front", "프론트"], ["back", "백오피스"]];
 var adminAccountsLoaded = false;
 function renderAdminCharacterAccounts() {
@@ -2543,6 +2544,86 @@ syncIntruders(true); syncMeetings(true);
 setInterval(function () { syncMeetings(false); }, 5000);
 document.getElementById("autolunch").addEventListener("change", function () { syncMeetings(false); });
 function fillCfg() { var c = cfg(); document.getElementById("cfgls").value = c.ls; document.getElementById("cfgle").value = c.le; document.getElementById("cfgoe").value = c.oe; document.getElementById("boss-visit").checked = c.bossVisit; syncBossVisitUI(); }
+var COPY_FIELDS = [
+  ["홈 소개", [["ledeOffice", "사무실 테마"], ["ledeBattlefield", "전장 테마"], ["ledeSpace", "우주 테마"], ["ledeSecond", "홈 소개 보조 문구"]]],
+  ["지도 안내", [["mapOffice", "사무실"], ["mapBattlefield", "전장"], ["mapSpace", "우주"]]],
+  ["직원·영웅 안내", [["teamOffice", "사무실"], ["teamBattlefield", "전장"], ["teamSpace", "우주"], ["teamNoteOffice", "사무실 권한 안내"], ["teamNoteBattlefield", "전장 권한 안내"], ["teamNoteSpace", "우주 권한 안내"]]],
+  ["회의·프로젝트·간식·공지", [["meetingOffice", "사무실 회의"], ["meetingBattlefield", "전장 회의"], ["meetingSpace", "우주 회의"], ["projectOffice", "사무실 프로젝트 안내"], ["projectOther", "전장·우주 프로젝트 안내"], ["snackOffice", "사무실 간식 안내"], ["snackOther", "전장·우주 간식 안내"], ["notice", "공지 안내"]]],
+  ["하단 사용 안내", [["footerOne", "첫 번째 안내"], ["footerTwoOffice", "사무실 두 번째 안내"], ["footerTwoOther", "전장·우주 두 번째 안내"], ["footerThree", "세 번째 안내"]]]
+];
+var COPY_DEFAULTS = {
+  ledeOffice: "프론트와 백오피스, 두 개의 차원에서 {count}명의 직원이 서비스를 지킵니다.",
+  ledeBattlefield: "프론트와 백오피스, 두 개의 차원에서 {count}명의 영웅이 전장을 지킵니다.",
+  ledeSpace: "프론트와 백오피스, 두 개의 차원에서 {count}명의 승무원이 우주를 지킵니다.",
+  ledeSecond: "차원과 유니버스를 고르거나 이름과 스킬로 검색해서 동료를 만나보세요.",
+  mapOffice: "49개 자리 중 47개는 직원 좌석이고, FTP·ER 전용 PC 2개는 잠시 사용할 수 있어요. PC 사용 중에도 지정 좌석과 닉네임은 유지됩니다. 본인 좌석을 클릭하면 돌아갑니다.",
+  mapBattlefield: "영웅은 상태와 회의에 따라 전장과 각 유니버스를 오갑니다. 캐릭터 시트에서 상태·근태·업무를 관리하고, 회의가 끝나면 원래 활동 구역으로 돌아갑니다.",
+  mapSpace: "승무원은 상태와 회의에 따라 우주 기지와 각 유니버스를 오갑니다. 캐릭터 시트에서 상태·근태·업무를 관리하고, 회의가 끝나면 원래 활동 구역으로 돌아갑니다.",
+  teamOffice: "계정 캐릭터는 회원가입 후 본인이 만들거나 관리자가 계정에 연결합니다. 이 화면에서 추가하는 명단 전용 직원은 지도와 명단에 표시됩니다. 닉네임과 대분류는 필수이며, 소분류·직급·직업은 선택 사항입니다. 명단 직원의 추가·제거와 계정 캐릭터 연결·삭제는 관리자만 할 수 있습니다.",
+  teamBattlefield: "계정 캐릭터는 회원가입 후 본인이 만들거나 관리자가 계정에 연결합니다. 이 화면에서 추가하는 명단 전용 영웅은 지도와 명단에 표시됩니다. 닉네임과 대분류는 필수이며, 소분류·직급·직업은 선택 사항입니다. 명단 영웅의 추가·제거와 계정 캐릭터 연결·삭제는 관리자만 할 수 있습니다.",
+  teamSpace: "계정 캐릭터는 회원가입 후 본인이 만들거나 관리자가 계정에 연결합니다. 이 화면에서 추가하는 명단 전용 승무원은 지도와 명단에 표시됩니다. 닉네임과 대분류는 필수이며, 소분류·직급·직업은 선택 사항입니다. 명단 승무원의 추가·제거와 계정 캐릭터 연결·삭제는 관리자만 할 수 있습니다.",
+  teamNoteOffice: "명단 직원의 추가·제거와 계정 캐릭터 연결·삭제는 관리자 권한이 필요합니다. 일반 사용자는 회원가입 후 본인 계정의 캐릭터를 만들 수 있습니다.",
+  teamNoteBattlefield: "명단 영웅의 추가·제거와 계정 캐릭터 연결·삭제는 관리자 권한이 필요합니다. 일반 사용자는 회원가입 후 본인 계정의 캐릭터를 만들 수 있습니다.",
+  teamNoteSpace: "명단 승무원의 추가·제거와 계정 캐릭터 연결·삭제는 관리자 권한이 필요합니다. 일반 사용자는 회원가입 후 본인 계정의 캐릭터를 만들 수 있습니다.",
+  meetingOffice: "회의를 시작하면 참석 직원이 사무실 오른쪽 회의실로 이동합니다. 회의실은 3개이며 회의 하나에 최대 8명까지 참석할 수 있습니다. 회의가 끝나면 원래 자리로 돌아가고, 연차 중인 직원은 참석할 수 없습니다.",
+  meetingBattlefield: "회의를 시작하면 참석 영웅이 지도 아래쪽 작전 테이블로 이동합니다. 테이블은 3개이며 회의 하나에 최대 8명까지 참석할 수 있습니다. 회의가 끝나면 원래 자리로 돌아가고, 연차 중인 영웅은 참석할 수 없습니다.",
+  meetingSpace: "회의를 시작하면 참석 승무원이 지도 아래쪽 관제 테이블로 이동합니다. 테이블은 3개이며 회의 하나에 최대 8명까지 참석할 수 있습니다. 회의가 끝나면 원래 자리로 돌아가고, 연차 중인 승무원은 참석할 수 없습니다.",
+  projectOffice: "프로젝트 팀을 만들고 기존 직원을 참여시킬 수 있습니다. 각 팀은 지도에 전용 구역을 가지며, 프로젝트 팀은 최대 3개까지 운영할 수 있습니다.",
+  projectOther: "용병단을 만들고 기존 영웅을 참여시킬 수 있습니다. 각 팀은 지도에 전용 구역을 가지며, 용병단은 최대 3개까지 운영할 수 있습니다.",
+  snackOffice: "간식 당번 기간과 담당 팀, 먹을거리를 등록하세요. 기간 중에는 팀 구역과 팀원 정보에 간식이 표시됩니다.",
+  snackOther: "보급 담당 기간과 팀, 먹을거리를 등록하세요. 기간 중에는 각 유니버스 구역과 팀원 정보에 보급품이 표시됩니다.",
+  notice: "공지는 모든 사용자에게 표시됩니다. 관리자 또는 직급이 팀장·상무인 캐릭터의 소유자만 작성할 수 있습니다.",
+  footerOne: "캐릭터 시트에서 직급·직업·스킬·스탯·체력을 관리할 수 있습니다. 레벨은 5개 스탯의 합계로 계산됩니다.",
+  footerTwoOffice: "업무·근무 상태·전출·좌석은 캐릭터 시트에서 관리합니다. FTP·ER 전용 PC를 임시로 사용해도 지정 좌석은 유지됩니다.",
+  footerTwoOther: "업무·근무 상태·전출 정보는 캐릭터 시트에서 관리합니다. 회의가 끝나면 각자 원래 활동 구역으로 돌아갑니다.",
+  footerThree: "회의·프로젝트 팀·간식 담당은 업무 메뉴에서, 공지와 개인·그룹 채팅은 공지·채팅 메뉴에서 이용할 수 있습니다."
+};
+function copyValue(key) {
+  var saved = store.cfg.copy, value = saved && saved[key];
+  return typeof value === "string" ? value : COPY_DEFAULTS[key];
+}
+function copyVariant(base) {
+  return WORLD_THEME === "office" ? base + "Office" : base + (WORLD_THEME === "space" ? "Space" : "Battlefield");
+}
+function applySiteCopy() {
+  var count = document.getElementById("total"), first = document.getElementById("lede-first"), second = document.getElementById("lede-second");
+  if (first) first.textContent = copyValue(copyVariant("lede")).replace(/\{count\}/g, count ? count.textContent : "0");
+  if (second) second.textContent = copyValue("ledeSecond");
+  [["map-guide", copyVariant("map")], ["team-guide", copyVariant("team")], ["teamnote", copyVariant("teamNote")],
+    ["meeting-guide", copyVariant("meeting")], ["project-guide", WORLD_THEME === "office" ? "projectOffice" : "projectOther"],
+    ["snack-guide", WORLD_THEME === "office" ? "snackOffice" : "snackOther"], ["notice-guide", "notice"],
+    ["footer-guide-1", "footerOne"], ["footer-guide-2", WORLD_THEME === "office" ? "footerTwoOffice" : "footerTwoOther"],
+    ["footer-guide-3", "footerThree"]].forEach(function (entry) {
+    var element = document.getElementById(entry[0]);
+    if (element) element.textContent = copyValue(entry[1]);
+  });
+}
+function renderCopyEditor() {
+  var panel = document.getElementById("copy-admin"), fields = document.getElementById("copy-admin-fields"), html = "";
+  if (!panel || !fields) return;
+  panel.hidden = currentRole !== "ADMIN";
+  if (panel.hidden) return;
+  COPY_FIELDS.forEach(function (group) {
+    html += '<fieldset class="copy-admin-group"><legend>' + esc(group[0]) + "</legend>";
+    group[1].forEach(function (field) {
+      html += '<label class="copy-admin-field">' + esc(field[1]) + '<textarea data-copy-key="' + esc(field[0]) + '" maxlength="1500" rows="3">' + esc(copyValue(field[0])) + "</textarea></label>";
+    });
+    html += "</fieldset>";
+  });
+  fields.innerHTML = html;
+}
+document.getElementById("copy-admin-form").addEventListener("submit", function (event) {
+  event.preventDefault();
+  if (currentRole !== "ADMIN") return;
+  var copy = {}, status = document.getElementById("copy-admin-status");
+  document.querySelectorAll("#copy-admin-fields [data-copy-key]").forEach(function (field) { copy[field.dataset.copyKey] = field.value; });
+  status.textContent = "저장 중...";
+  commit("cfg", "copy", copy, function () {
+    applySiteCopy();
+    status.textContent = "안내 문구를 저장했습니다.";
+    renderCopyEditor();
+  }, "#copy-admin-status");
+});
 function saveBossVisit(enabled) {
   var next = cfg(); next.bossVisit = !!enabled;
   if (dbRef && dbRef.setBossVisit) {
@@ -2587,28 +2668,30 @@ function syncBossVisitUI() {
   if (siren) siren.hidden = !active;
 }
 function syncOfficeCopy() {
-  var office = WORLD_THEME === "office", total = document.getElementById("total"), lead = total && total.nextSibling;
-  if (lead) lead.textContent = office ? "명의 직원이 서비스를 지킵니다." : "명의 영웅이 서비스를 지킵니다.";
+  var office = WORLD_THEME === "office", space = WORLD_THEME === "space", worldName = office ? "사무실" : space ? "우주 기지" : "전장";
+  var mapButton = document.querySelector('#views [data-v="map"] span'), worldSection = document.getElementById("world");
   var groups = document.querySelectorAll("#views .nlab"), group = groups[0], roster = document.querySelector('#views [data-v="list"] span'), team = document.querySelector('#views [data-v="team"] span'), teamTitle = document.querySelector("#teampane h2"), projectLabel = document.querySelector("#projpane .project-hero-label"), picker = document.getElementById("project-hero-pick"), map = document.getElementById("map"), world = document.getElementById("world");
-  if (group) group.textContent = office ? "직원" : "영웅";
-  if (groups[1]) groups[1].textContent = office ? "업무" : "군영";
-  if (roster) roster.textContent = office ? "직원 명단" : "영웅 명부";
-  if (team) team.textContent = office ? "직원 관리" : "영웅 모집";
-  if (teamTitle) teamTitle.textContent = office ? "직원 관리" : "영웅 모집";
-  if (projectLabel) projectLabel.textContent = office ? "기존 직원을 프로젝트팀에 합류시키기 (선택)" : "기존 영웅을 팀에 합류시키기 (선택)";
-  if (picker) picker.setAttribute("aria-label", office ? "프로젝트에 합류시킬 기존 직원" : "프로젝트에 합류시킬 기존 영웅");
-  var projectNav = document.querySelector('#views [data-v="proj"] span'), meetingNav = document.querySelector('#views [data-v="meet"] span'), snackNav = document.querySelector('#views [data-v="snack"] span'), chatNav = document.querySelector('#views [data-v="chat"] span'), projectTitle = document.querySelector("#projpane h2"), meetingTitle = document.querySelector("#meetpane h2"), snackTitle = document.querySelector("#snackpane h2"), mapGuide = document.getElementById("map-guide"), meetingGuide = document.getElementById("meeting-guide");
-  if (projectNav) projectNav.textContent = office ? "프로젝트 팀" : "용병단";
-  if (meetingNav) meetingNav.textContent = office ? "회의" : "작전 회의";
+  var projectTitle = document.querySelector("#projpane h2"), meetingTitle = document.querySelector("#meetpane h2"), snackTitle = document.querySelector("#snackpane h2");
+  if (mapButton) mapButton.textContent = worldName;
+  if (worldSection) worldSection.setAttribute("aria-label", worldName + " 지도");
+  if (group) group.textContent = office ? "직원" : space ? "승무원" : "영웅";
+  if (groups[1]) groups[1].textContent = office ? "업무" : space ? "임무" : "군영";
+  if (roster) roster.textContent = office ? "직원 명단" : space ? "승무원 명단" : "영웅 명부";
+  if (team) team.textContent = office ? "직원 관리" : space ? "승무원 모집" : "영웅 모집";
+  if (teamTitle) teamTitle.textContent = office ? "직원 관리" : space ? "승무원 모집" : "영웅 모집";
+  if (projectLabel) projectLabel.textContent = office ? "기존 직원을 프로젝트팀에 합류시키기 (선택)" : space ? "기존 승무원을 원정대에 합류시키기 (선택)" : "기존 영웅을 용병단에 합류시키기 (선택)";
+  if (picker) picker.setAttribute("aria-label", office ? "프로젝트에 합류시킬 기존 직원" : space ? "원정대에 합류시킬 기존 승무원" : "용병단에 합류시킬 기존 영웅");
+  var projectNav = document.querySelector('#views [data-v="proj"] span'), meetingNav = document.querySelector('#views [data-v="meet"] span'), snackNav = document.querySelector('#views [data-v="snack"] span'), chatNav = document.querySelector('#views [data-v="chat"] span');
+  if (projectNav) projectNav.textContent = office ? "프로젝트 팀" : space ? "원정대" : "용병단";
+  if (meetingNav) meetingNav.textContent = office ? "회의" : space ? "함교 회의" : "작전 회의";
   if (snackNav) snackNav.textContent = office ? "간식" : "보급";
   if (chatNav) chatNav.textContent = office ? "공지·채팅" : "전령";
-  if (projectTitle) projectTitle.textContent = office ? "프로젝트 팀" : "용병단";
-  if (meetingTitle) meetingTitle.textContent = office ? "회의" : "작전 회의";
+  if (projectTitle) projectTitle.textContent = office ? "프로젝트 팀" : space ? "원정대" : "용병단";
+  if (meetingTitle) meetingTitle.textContent = office ? "회의" : space ? "함교 회의" : "작전 회의";
   if (snackTitle) snackTitle.textContent = office ? "간식 담당" : "보급 담당";
-  if (mapGuide) mapGuide.textContent = office ? "49개 자리로 구성된 사무실이에요. 47개 직원 좌석과 두 번째 줄 첫 두 칸의 FTP, ER 전용 PC가 있어요. 빈 직원 좌석은 캐릭터 시트에서 지정하고, FTP·ER PC는 지도에서 클릭해 잠시 사용할 수 있어요. PC 사용 중에도 기존 지정 좌석과 닉네임은 유지되며, 본인 좌석을 클릭하면 돌아갑니다. 오전 9시부터 퇴근 설정 시간까지 업무중인 직원은 자기 책상에 앉아요. 점심에는 직원들이 모이지 않고 머리 위에 식사 아이콘만 표시돼요." : "캐릭터 시트의 「자리」에서 빈 좌석을 선택할 수 있어요. 다른 캐릭터가 고른 좌석은 선택할 수 없고, 오전 9시부터 퇴근 설정 시간까지 「업무중」 상태인 캐릭터는 자기 책상에 앉아요. 점심·휴식·회의·연차 중에는 자리를 비웁니다.";
-  if (meetingGuide) meetingGuide.textContent = office ? "사무실 오른쪽에 분리된 회의실 3개가 있어요. 회의 이름과 참석자를 정하면 지정된 회의실에 표시되고, 회의가 끝나면 각자 자리로 돌아갑니다. 연차인 직원은 참석할 수 없고, 회의실마다 최대 8명까지 참석할 수 있어요." : "회의 이름과 참석자를 정하면 지도 아래쪽 회의실 테이블에 표시돼요. 회의가 끝나면 각자 자리로 돌아가고, 연차인 사람은 참석할 수 없어요. 테이블은 3개이며 각 회의에 최대 8명까지 참석할 수 있어요.";
-  if (map) map.setAttribute("aria-label", office ? "49개 자리로 구성된 사무실. 47개 직원 좌석과 두 번째 줄의 FTP, ER 전용 PC가 있습니다. FTP 또는 ER PC를 클릭해 잠시 사용하고, 본인 지정 좌석을 클릭해 돌아갈 수 있습니다." : "멀티버스 지도. 영웅 캐릭터가 움직이고, 회의실과 프로젝트 구역이 있습니다.");
-  if (world) world.setAttribute("aria-label", office ? "사무실 지도" : "멀티버스 지도");
+  if (world) world.setAttribute("aria-label", worldName + " 지도");
+  applySiteCopy();
+  if (map) map.setAttribute("aria-label", worldName + " 지도. " + document.getElementById("map-guide").textContent);
   syncBossVisitUI();
 }
 function setWorldTheme(theme, save) {
@@ -2643,7 +2726,7 @@ if (window.claude && window.claude.use) {
     currentCharacterId = u && u.info ? u.info.characterId : null;
     currentCanAnnounce = currentRole === "ADMIN" || !!(u && u.info && u.info.canAnnounce);
     return u && u.can ? u.can("data.write") : null;
-  }).then(function (v) { canWrite = v; refreshPanes(); renderGrid(); }, function () {});
+  }).then(function (v) { canWrite = v; refreshPanes(); renderGrid(); renderCopyEditor(); }, function () {});
   window.claude.use("db").then(function (db) {
     if (!db) return;
     dbRef = db;
@@ -2718,14 +2801,18 @@ if (window.claude && window.claude.use) {
       var m = {};
       snap.docs.forEach(function (x) {
         var v = x.data();
-        if (v && typeof v === "object") m[x.id] = {
+        if (x.id === "copy" && v && typeof v === "object") {
+          var copy = {};
+          COPY_FIELDS.forEach(function (group) { group[1].forEach(function (field) { if (typeof v[field[0]] === "string") copy[field[0]] = v[field[0]].slice(0, 1500); }); });
+          m.copy = copy;
+        } else if (v && typeof v === "object") m[x.id] = {
           ls: typeof v.ls === "string" ? v.ls : "12:00",
           le: typeof v.le === "string" ? v.le : "13:00",
           oe: typeof v.oe === "string" ? v.oe : "18:00",
           bossVisit: v.bossVisit === true
         };
       });
-      store.cfg = m; fillCfg(); applySeats(false); syncMeetings(false);
+      store.cfg = m; fillCfg(); applySiteCopy(); renderCopyEditor(); applySeats(false); syncMeetings(false);
     }, function () {});
     db.collection("ot").onSnapshot(function (snap) {
       var m = {};

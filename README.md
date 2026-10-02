@@ -1,38 +1,204 @@
-# hero-board-server
+# 멀티버스 닉네임판
 
-멀티버스 닉네임판 서버. **Spring Boot 3.3 + JDK 21 + MyBatis + H2**(개발용)를 사용하며, 운영 DB는 Oracle로 교체할 수 있습니다.
-화면(HTML/CSS/JS)은 `src/main/resources/static/` 안에 있어 서버 하나로 화면과 API를 함께 제공합니다.
+Spring Boot 기반의 실시간 팀·캐릭터 협업 보드입니다. 사무실·전장·우주 테마 지도에서 캐릭터와 근무 상태를 확인하고, 회의·프로젝트 팀·간식 당번·공지·개인 및 그룹 채팅을 관리할 수 있습니다.
 
-## 실행
+HTML, CSS, JavaScript 정적 화면과 REST API를 하나의 서버에서 제공합니다.
 
-### Eclipse
-1. `File > Import > Maven > Existing Maven Projects` → 이 폴더 선택
-2. `kr.co.herob.board.HeroBoardApplication` 우클릭 → `Run As > Java Application` (Spring Tools가 있으면 `Spring Boot App`)
-3. 브라우저에서 http://localhost:8080
+## 목차
 
-### 명령줄
-```
+- [주요 기능](#주요-기능)
+- [기술 스택](#기술-스택)
+- [로컬 실행](#로컬-실행)
+- [처음 사용하는 방법](#처음-사용하는-방법)
+- [화면 기능](#화면-기능)
+- [계정과 권한](#계정과-권한)
+- [저장 및 실시간 동기화](#저장-및-실시간-동기화)
+- [API](#api)
+- [배포](#배포)
+- [데이터베이스](#데이터베이스)
+- [프로젝트 구조](#프로젝트-구조)
+- [문제 해결](#문제-해결)
+- [운영 전 확인 사항](#운영-전-확인-사항)
+
+## 주요 기능
+
+- **캐릭터와 명단:** 캐릭터 등록, 검색·정렬, 직급·직업·스킬·스탯·체력 관리
+- **테마 지도:** 사무실·전장·우주 테마, 차원·유니버스 필터, 캐릭터 이동과 상태 표시
+- **근무 관리:** 업무중·점심·휴식·자리비움·연차 및 퇴근 시간 설정
+- **좌석 관리:** 사무실 직원 좌석 47개와 FTP·ER 전용 PC 2개
+- **임시 PC 사용:** FTP·ER PC를 잠시 사용해도 지정 좌석과 닉네임을 보존하고, 클릭해 원래 자리로 복귀
+- **업무 협업:** 회의, 프로젝트 팀, 간식 당번 등록 및 지도 표시
+- **소통:** 전체 공지와 참여자만 볼 수 있는 개인·그룹 채팅
+- **사장님 등장:** 모든 사용자가 상태를 켜고 끌 수 있으며, 변경 사항과 사이렌이 모든 사용자 화면에 공유됨
+- **테마별 안내와 관리자 편집:** 안내 문구는 사무실·전장·우주 테마에 맞춰 표시되며, 관리자는 사이트 안내 문구를 수정해 모든 사용자에게 공유할 수 있음
+- **실시간 반영:** SSE 변경 알림을 사용하고, 연결할 수 없으면 5초 간격으로 폴링
+
+## 기술 스택
+
+| 영역 | 기술 |
+|---|---|
+| 서버 | Java 21, Spring Boot 3.3.5, Spring Web, Spring Security |
+| 데이터 접근 | MyBatis 3.0.3 |
+| 기본 DB | H2 파일 데이터베이스 |
+| 배포용 DB 드라이버 | PostgreSQL JDBC |
+| 화면 | HTML, CSS, 바닐라 JavaScript |
+| 빌드·테스트 | Maven, JUnit 5, Spring Boot Test, MockMvc |
+
+## 로컬 실행
+
+### 준비
+
+- JDK 21
+- Maven
+
+### 실행 명령
+
+프로젝트 루트에서 실행합니다.
+
+```bash
 mvn spring-boot:run
-mvn test            # API, 로그인/권한, 실시간 구독 테스트
 ```
 
-사내망이라 Maven Central에 못 붙는 경우: 사내 Nexus/Artifactory 주소를 `~/.m2/settings.xml` 의 `<mirror>` 로 설정해야 합니다. (평소 쓰시는 프로젝트의 settings.xml 을 그대로 쓰면 됩니다.)
+브라우저에서 <http://localhost:8080>을 엽니다. 로컬 기본 설정은 `./data/herodb`에 H2 파일 데이터베이스를 만듭니다.
 
-## 무료 배포(Render)
+테스트는 다음과 같이 실행합니다.
 
-이 저장소에는 Render 무료 Web Service용 `Dockerfile`과 `render.yaml`이 포함되어 있습니다.
-
-1. GitHub 저장소를 Render에 연결하고 `Blueprint`로 이 저장소를 선택합니다.
-2. `render.yaml`의 서비스가 생성되면 무료 플랜으로 배포합니다.
-3. 배포가 끝나면 Render가 제공하는 `onrender.com` 주소로 접속합니다.
-
-무료 플랜은 사용하지 않을 때 절전 상태가 되어 첫 접속이 느릴 수 있습니다. 배포 시에는 컨테이너 내부 H2를 사용하지 말고 Supabase·Neon 등 외부 PostgreSQL을 연결하세요. 외부 PostgreSQL을 사용하면 Render 재배포와 무관하게 계정·캐릭터·문서가 유지됩니다.
-
-### PostgreSQL 연결
-
-배포 서비스의 Environment Variables에 다음 값을 설정합니다.
-
+```bash
+mvn test
 ```
+
+주요 API 통합 테스트는 `DocApiTest`에 있습니다.
+
+### Eclipse에서 실행
+
+1. `File > Import > Maven > Existing Maven Projects`에서 프로젝트 폴더를 선택합니다.
+2. `kr.co.herob.board.HeroBoardApplication`을 `Run As > Java Application`으로 실행합니다. Spring Tools가 설치되어 있으면 `Spring Boot App`으로 실행할 수 있습니다.
+3. <http://localhost:8080>에 접속합니다.
+
+Maven Central에 연결할 수 없는 사내망에서는 Maven `settings.xml`에 사내 Nexus 또는 Artifactory 미러를 설정하세요.
+
+## 처음 사용하는 방법
+
+1. 로그인 화면에서 계정을 만들거나 기존 계정으로 로그인합니다.
+2. 새 계정은 로그인 후 캐릭터 이름·성별·유니버스를 등록합니다.
+3. 지도, 영웅 명부, 회의, 프로젝트 팀, 간식, 공지·채팅 메뉴를 이용합니다.
+4. 캐릭터 카드를 열어 상태·좌석·직급·스탯·체력·업무 등을 관리합니다.
+
+아이디는 영문 소문자·숫자·`_`·`-` 조합의 3~30자이며, 비밀번호는 비어 있지 않아야 합니다. 가입 폼에서 아이디는 소문자로 정규화됩니다.
+
+저장소에 `admin` 계정이 없으면 서버 시작 시 데모 관리자 `admin` / `admin`이 생성됩니다. **운영 환경에 배포하기 전에 반드시 이 기본 계정 정책을 변경하세요.** 기존 관리자 계정은 자동으로 초기화되거나 비밀번호가 변경되지 않습니다.
+
+## 화면 기능
+
+### 지도와 캐릭터
+
+- 화면 모드는 다크·라이트, 지도 테마는 사무실·전장·우주 중에서 선택할 수 있습니다.
+- 차원과 유니버스를 선택하고, 이름·직업·스킬로 검색하거나 레벨·전투력·이름순으로 정렬할 수 있습니다.
+- 캐릭터 시트에서 닉네임, 직급, 직업, 스킬, 5개 스탯, 체력, 업무, 근태, 전출, 좌석을 관리합니다.
+- 레벨은 저장된 5개 스탯의 합계로 계산됩니다. 체력은 0~100으로 설정하며 지도에 배터리 형태로 나타납니다.
+- 상태가 따로 저장되지 않은 캐릭터는 기본적으로 `업무중`입니다. 점심은 60분, 휴식은 30분 후 업무중으로 돌아오며, 자리비움은 다른 상태를 선택할 때까지 유지됩니다.
+- 사무실 테마에서 업무중 캐릭터는 오전 9시부터 설정된 퇴근 시간까지 지정 책상에 앉습니다. 지도 컨트롤에서 점심시간 자동화, 점심 시작·종료 시각, 퇴근 시각을 설정할 수 있습니다.
+
+### 좌석과 FTP·ER 전용 PC
+
+- 사무실 지도는 49개 위치로 구성됩니다. 이 중 47개는 직원 좌석이고, 나머지 2개는 FTP·ER 전용 PC입니다.
+- 캐릭터 시트의 자리 메뉴에서는 빈 직원 좌석을 지정합니다. 이미 다른 캐릭터가 지정한 자리는 선택할 수 없습니다.
+- FTP·ER PC는 지도에서 클릭해 잠시 사용할 수 있습니다. 사무실 버전에서는 사용 확인 후 캐릭터가 해당 PC로 이동합니다.
+- 임시 사용 상태는 기존 지정 좌석을 바꾸지 않습니다. 원래 좌석과 그 좌석의 닉네임은 그대로 유지됩니다.
+- 사용 중인 전용 PC를 다시 클릭하거나 본인 지정 좌석을 클릭하면 원래 자리로 돌아갑니다. 화면에서 이미 다른 캐릭터가 사용 중으로 공유된 PC는 선택할 수 없습니다.
+
+### 회의와 프로젝트 팀
+
+- 회의는 이름과 참석자를 지정해 시작하고, 회의 종료 시 참석자는 원래 상태와 자리로 돌아갑니다. 회의실은 3개이며 회의 하나에 최대 8명까지 참석할 수 있습니다. 연차 중인 캐릭터는 회의에 참여할 수 없습니다.
+- 프로젝트 팀은 최대 3개까지 만들 수 있고, 각 팀은 지도에 전용 구역을 가집니다. 팀 이름과 참여 멤버를 관리할 수 있습니다.
+
+### 간식, 공지와 채팅
+
+- 간식 당번 기간, 담당 팀, 먹을거리를 등록할 수 있습니다. 기간 중에는 지도와 관련 팀·캐릭터 화면에 간식 정보가 표시됩니다.
+- 공지는 전체 사용자에게 표시됩니다. 관리자 또는 직급이 팀장·상무인 캐릭터의 소유자가 작성할 수 있습니다.
+- 개인·그룹 채팅은 계정 단위 대화이며, 메시지는 참여 계정에만 제공됩니다. 새 메시지 수는 채팅 메뉴에 표시됩니다.
+
+### 사장님 등장
+
+사무실·전장·우주 지도에서 누구나 사장님 등장 상태를 켜거나 끌 수 있습니다. 상태는 서버에 공유되며, 켜져 있으면 모든 사용자의 지도에 사이렌과 테마별 사장님 캐릭터가 표시됩니다.
+
+### 테마별 용어와 안내 문구
+
+지도 메뉴와 직원·영웅·승무원 관련 용어는 선택한 사무실·전장·우주 테마에 맞춰 바뀝니다. 관리자 계정으로 로그인하면 화면 하단의 **사이트 안내 문구 편집**에서 홈 소개, 지도·명단·회의·프로젝트·간식·공지 안내와 하단 사용 안내를 수정할 수 있습니다. 테마별 문구를 각각 편집할 수 있고, 줄바꿈을 포함한 변경 내용은 `cfg/copy` 설정 문서에 저장되어 모든 사용자 화면에 공유됩니다.
+
+## 계정과 권한
+
+비밀번호는 BCrypt 해시로 저장됩니다. 일반 계정은 본인 캐릭터와 일부 공용 운영 문서만 수정할 수 있으며, 관리자는 모든 문서를 관리할 수 있습니다.
+
+| 작업 | 일반 계정 | 관리자 |
+|---|---|---|
+| 계정 생성 및 로그인 | 가능 | 가능 |
+| 캐릭터 생성 | 계정당 1개 | 여러 개 |
+| 본인 캐릭터 정보와 캐릭터 문서 수정 | 가능 | 가능 |
+| 회의·간식·프로젝트 팀 문서 수정 | 가능 | 가능 |
+| 공지 작성 | 본인 캐릭터 직급이 팀장·상무인 경우 | 가능 |
+| 다른 계정의 캐릭터·문서 관리 | 불가 | 가능 |
+| 사장님 등장 상태 변경 | 가능 | 가능 |
+
+일반 계정은 `nicks`, `titles`, `skills`, `stats`, `health`, `tasks`, `pres`, `ot`, `seats`, `status`, `jobs`, `moves` 중 본인 캐릭터 ID에 해당하는 문서를 수정할 수 있습니다. `meetings`, `snacks`, `projects`는 로그인 사용자 모두 수정할 수 있습니다. 공용 설정 문서의 사장님 등장 상태는 별도 API를 통해 누구나 변경할 수 있습니다.
+
+## 저장 및 실시간 동기화
+
+- 계정과 캐릭터는 `HERO_ACCOUNT`, `HERO_CHARACTER` 테이블에 저장됩니다.
+- 화면의 캐릭터·업무·좌석·채팅 공지 등 일반 문서는 `HERO_DOC` 테이블에 컬렉션과 문서 ID를 키로 저장합니다. 본문은 JSON입니다.
+- 개인·그룹 채팅도 문서 저장소에 저장되지만, 서버는 참여 계정의 메시지만 별도 채팅 API로 반환합니다.
+- 문서 변경은 SSE의 `refresh` 이벤트로 화면에 알립니다. 브라우저 또는 프록시에서 SSE를 사용할 수 없으면 5초 폴링으로 전환합니다.
+- 서버에 연결된 웹 화면에서 사용하는 데이터는 서버 DB에 저장되어 여러 사용자 화면에 공유됩니다. 브라우저에서 직접 정적 파일을 여는 방식은 로그인 및 서버 공유 기능을 대체하지 않습니다.
+
+## API
+
+로그인·회원가입·사용 가능 아이디 확인·현재 세션 확인을 제외한 `/api/**` 요청은 로그인 세션이 필요합니다.
+
+### 인증 및 캐릭터
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/api/me` | 현재 계정, 역할, 캐릭터, 권한 정보 |
+| `GET` | `/api/register/username-available?username=...` | 아이디 사용 가능 여부 |
+| `POST` | `/api/register` | `{ "username": "...", "password": "..." }` 가입 후 로그인 |
+| `POST` | `/api/login` | 같은 형식으로 로그인 |
+| `POST` | `/api/logout` | 로그아웃, 성공 시 `204` |
+| `GET` | `/api/characters` | 등록된 캐릭터 목록 |
+| `POST` | `/api/characters` | 현재 계정의 캐릭터 생성 |
+| `PUT` | `/api/characters/{id}` | 본인 캐릭터 또는 관리자에 의한 수정 |
+| `DELETE` | `/api/characters/{id}` | 본인 캐릭터 또는 관리자에 의한 삭제 |
+| `GET` | `/api/admin/accounts` | 관리자용 계정·캐릭터 수 목록 |
+| `POST` | `/api/admin/characters` | 관리자가 계정에 캐릭터 연결 |
+
+### 문서, 실시간 이벤트와 공용 상태
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/api/docs` | 저장된 전체 공개 문서 조회 |
+| `GET` | `/api/events` | SSE 연결 (`connected`, `refresh` 이벤트) |
+| `PUT` | `/api/doc/{collection}/{id}` | 권한 확인 후 JSON 문서 저장 |
+| `DELETE` | `/api/doc/{collection}/{id}` | 권한 확인 후 문서 삭제 |
+| `POST` | `/api/boss-visit` | `{ "enabled": true }`로 사장님 등장 상태 변경 |
+
+허용된 문서 컬렉션은 `people`, `nicks`, `titles`, `skills`, `stats`, `health`, `tasks`, `pres`, `ot`, `seats`, `meetings`, `projects`, `snacks`, `chat`, `cfg`, `jobs`, `moves`, `status`입니다. 문서 ID는 영문·숫자·`_`·`-` 조합의 1~60자이고, 본문은 JSON 객체이며 직렬화 후 최대 100,000자입니다. 유효하지 않은 입력은 `400`, 권한이 없는 문서 작업은 `403`을 반환합니다.
+
+### 개인·그룹 채팅
+
+| 메서드 | 경로 | 설명 |
+|---|---|---|
+| `GET` | `/api/chats/private/contacts` | 현재 사용자를 제외한 채팅 상대 목록 |
+| `GET` | `/api/chats/private` | 현재 계정이 참여한 메시지 목록 |
+| `POST` | `/api/chats/private` | `{ "recipients": ["계정"], "text": "메시지" }` 전송 |
+
+메시지는 1~500자이며, 발신자를 포함해 대화 참여 계정은 최대 21개입니다(수신자 1~20명).
+
+## 배포
+
+저장소에는 Render Docker Web Service용 `Dockerfile`과 `render.yaml`이 있습니다. Render에서 GitHub 저장소를 Blueprint로 연결해 서비스를 생성할 수 있습니다. 서비스 헬스 체크 경로는 `/api/me`입니다.
+
+Render 무료 서비스의 컨테이너 파일 시스템은 영구 저장소로 취급하지 마세요. 배포 데이터 보존이 필요하면 Supabase·Neon 등 외부 PostgreSQL을 사용하고 Render 환경 변수에 접속 정보를 설정합니다.
+
+```text
 SPRING_DATASOURCE_URL=jdbc:postgresql://호스트:5432/데이터베이스명?sslmode=require
 SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
 SPRING_DATASOURCE_USERNAME=사용자명
@@ -41,120 +207,70 @@ SPRING_H2_CONSOLE_ENABLED=false
 SPRING_SQL_INIT_MODE=always
 ```
 
-Supabase 또는 Neon에서 PostgreSQL 데이터베이스를 만든 뒤 제공되는 호스트·포트·데이터베이스명·사용자명·비밀번호로 위 값을 채우세요. 비밀번호는 GitHub나 코드에 저장하지 말고 Render 환경변수에만 입력합니다. 서버가 처음 시작할 때 `schema.sql`이 `HERO_DOC`, `HERO_ACCOUNT`, `HERO_CHARACTER` 테이블을 생성합니다.
+비밀번호나 DB 자격 증명은 저장소, Docker 이미지, 소스 코드에 기록하지 말고 배포 환경의 비밀 변수로만 설정하세요. `Dockerfile`은 빌드 단계에서 테스트를 생략하므로 배포 전에 별도로 `mvn test`를 실행하는 것을 권장합니다.
 
-## 폴더
+## 데이터베이스
 
+### H2 로컬 DB
+
+- 기본 JDBC URL: `jdbc:h2:file:./data/herodb`
+- 파일: 프로젝트 루트의 `data/herodb.mv.db`
+- 콘솔: <http://localhost:8080/h2-console>
+- 콘솔 JDBC URL: `jdbc:h2:file:./data/herodb`
+- 사용자: `sa`
+- 기본 비밀번호: 없음
+
+`data/`를 삭제하면 문서·계정·캐릭터 데이터가 초기화됩니다. 삭제 전 서버를 종료하세요. 이후 시작하면 기본 관리자 계정 생성 여부를 다시 확인합니다.
+
+### PostgreSQL
+
+PostgreSQL JDBC 드라이버는 포함되어 있습니다. `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_DRIVER_CLASS_NAME`, `SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` 환경 변수로 연결을 설정할 수 있습니다. 스키마 초기화 설정은 `SPRING_SQL_INIT_MODE`로 조정합니다.
+
+### Oracle
+
+Oracle은 현재 바로 사용할 수 있는 검증 완료 구성이 아닙니다. `docs/oracle-ddl.sql`은 `HERO_DOC` 테이블만 생성하며, 계정과 캐릭터에 필요한 `HERO_ACCOUNT`, `HERO_CHARACTER` DDL 및 Oracle JDBC 드라이버 설정은 포함되어 있지 않습니다. Oracle 사용 전 드라이버·전체 스키마·MyBatis SQL 호환성을 준비하고 실제 Oracle 환경에서 검증해야 합니다.
+
+## 프로젝트 구조
+
+```text
+.
+├── Dockerfile
+├── render.yaml
+├── pom.xml
+├── docs/
+│   └── oracle-ddl.sql
+└── src/
+    ├── main/
+    │   ├── java/kr/co/herob/board/
+    │   │   ├── config/                 Spring Security 설정
+    │   │   ├── controller/             인증·캐릭터·문서 API
+    │   │   ├── mapper/                 MyBatis 인터페이스
+    │   │   └── service/                계정·권한·문서·채팅·SSE 처리
+    │   └── resources/
+    │       ├── mapper/                 MyBatis SQL
+    │       ├── static/                 HTML, CSS, JavaScript 화면
+    │       ├── application.properties  서버·DB 설정
+    │       └── schema.sql              H2/PostgreSQL 테이블 생성
+    └── test/
+        └── java/kr/co/herob/board/
+            └── DocApiTest.java          API 통합 테스트
 ```
-pom.xml
-src/main/java/kr/co/herob/board/
-  HeroBoardApplication.java
-  config/SecurityConfig.java        세션 인증과 요청 권한 설정
-  controller/DocController.java     REST API
-  service/AccountService.java       계정 및 캐릭터 관리
-  service/AuthService.java          현재 사용자와 문서 권한 확인
-  service/DocEventService.java      SSE 실시간 변경 이벤트
-  service/DocRow.java               DB 한 행
-  service/DocService.java           문서 검증 + 저장
-  service/HeroCharacter.java        캐릭터 모델
-  mapper/DocMapper.java             MyBatis 인터페이스
-src/main/resources/
-  mapper/DocMapper.xml              SQL (MyBatis)
-  schema.sql                        H2용 테이블 생성 (시작 시 자동 실행)
-  application.properties            포트와 DB 설정
-  static/                           화면 (index.html, css/, js/app.js, js/auth.js, js/db-adapter.js)
-docs/oracle-ddl.sql                 Oracle용 HERO_DOC DDL (계정·캐릭터 DDL은 아직 없음)
-src/test/.../DocApiTest.java        API 테스트
-```
 
-## API
+## 문제 해결
 
-| 메서드 | 주소 | 설명 |
-|---|---|---|
-| GET | `/api/me` | 로그인 사용자, 역할, 캐릭터 정보와 `canWrite` 반환 (인증 불필요) |
-| GET | `/api/register/username-available?username=...` | 가입 아이디 사용 가능 여부 확인 (인증 불필요) |
-| POST | `/api/register` | `{ "username": "...", "password": "..." }` 가입 후 로그인 세션 생성 |
-| POST | `/api/login` | 같은 형식의 로그인 요청, 세션 생성 |
-| POST | `/api/logout` | 로그아웃, 성공 시 204 |
-| GET | `/api/characters` | 캐릭터 목록 조회 (로그인 필요) |
-| POST | `/api/characters` | 현재 계정의 캐릭터 생성 (계정당 1개) |
-| PUT | `/api/characters/{id}` | 본인 캐릭터 또는 관리자 수정 |
-| DELETE | `/api/characters/{id}` | 본인 캐릭터 또는 관리자 삭제 |
-| GET | `/api/docs` | 모든 문서 `{ 컬렉션: { 문서id: {…} } }` (로그인 필요) |
-| GET | `/api/events` | SSE 변경 구독 (`connected`, `refresh` 이벤트, 로그인 필요) |
-| GET | `/api/chats/private/contacts` | 개인·그룹 대화 상대 목록 (로그인 필요) |
-| GET | `/api/chats/private` | 현재 계정이 참여한 개인·그룹 메시지만 조회 (로그인 필요) |
-| POST | `/api/chats/private` | `{ "recipients": ["계정"], "text": "..." }` 개인·그룹 메시지 전송 |
-| PUT | `/api/doc/{컬렉션}/{id}` | JSON 객체 저장. 권한 없으면 403 |
-| DELETE | `/api/doc/{컬렉션}/{id}` | 문서 삭제. 권한 없으면 403 |
-
-- `/api/me`, 회원가입, 로그인, 로그아웃 외 API는 로그인 세션이 필요합니다.
-- 컬렉션 이름은 `DocService.COLLECTIONS` 목록만 허용 (그 외 400). id 는 영문/숫자/`_`/`-` 1~60자입니다. 본문은 JSON 객체여야 하며 직렬화 후 100,000자 이하여야 합니다.
-- 비밀번호는 빈 값만 거부하며 길이 제한은 두지 않습니다.
-- `ADMIN`은 모든 문서 컬렉션을 수정할 수 있습니다. 로그인한 일반 계정도 회의(`meetings`), 간식 당번(`snacks`), 프로젝트 팀(`projects`) 문서는 만들고 수정·삭제할 수 있습니다. 본인 캐릭터가 소유자인 경우 `nicks`, `titles`, `skills`, `stats`, `health`, `tasks`, `pres`, `ot`, `seats`, `status`, `jobs`, `moves` 컬렉션의 해당 캐릭터 문서도 수정할 수 있습니다. 공지(`chat`)는 관리자 또는 본인 캐릭터 직급이 `팀장`·`상무`인 사용자만 작성할 수 있으며, 나머지는 관리자만 수정할 수 있습니다.
-- 개인·그룹 채팅은 별도 API를 사용하며 참여 계정에게만 메시지를 반환합니다. 전체 문서 조회 API에는 개인·그룹 메시지가 포함되지 않습니다.
-- `/api/me`의 `canWrite`는 관리자 여부를 나타냅니다. 일반 계정의 본인 캐릭터 문서 쓰기 권한과는 별개입니다.
-- 문서 저장/삭제 시 서버가 `refresh` SSE 이벤트를 전송하고, 화면은 이벤트를 받으면 `/api/docs` 를 다시 읽습니다.
-- SSE 연결이 불가능하거나 실패하면 화면은 5초 폴링으로 전환합니다 (`static/js/db-adapter.js` 의 `POLL_MS`).
-
-## 화면과 서버가 연결되는 방식
-
-화면에는 로그인·회원가입·캐릭터 등록 폼이 있으며, `static/js/auth.js`가 세션 API와 연결합니다.
-`app.js` 는 `window.claude.use("db")` 인터페이스를 사용하고, `static/js/db-adapter.js`가 이를 Spring API에 연결합니다.
-서버 연결에 실패하면 어댑터는 `null`을 반환하고 `app.js`는 브라우저 `localStorage` 모드로 동작합니다. 이 모드는 서버와 데이터를 공유하지 않습니다.
-채팅 화면은 팀장·상무급 또는 관리자가 작성하는 공지와 참여자만 볼 수 있는 개인·그룹 대화로 나뉩니다. 개인·그룹 채팅의 새 메시지는 채팅 탭에 읽지 않은 개수로 표시됩니다. 채팅 메시지는 캐릭터 머리 위에 표시하지 않고, 지도에는 캐릭터별 체력을 배터리 UI로 표시하며 본인 캐릭터 시트에서 0~100으로 조정할 수 있습니다. 배터리는 설정된 퇴근 시간에 가까워질수록 감소합니다.
-캐릭터 레벨은 저장된 5개 스탯의 합계를 기준으로 자동 계산됩니다.
-근무 상태는 별도 상태가 저장되지 않은 캐릭터도 기본 `업무중`으로 취급합니다. `점심`은 60분, `휴식`은 30분 뒤 업무중으로 돌아오며, `자리비움`은 사용자가 업무중 등 다른 상태를 선택할 때까지 유지됩니다.
-
-## 로그인과 편집 권한
-
-계정과 캐릭터는 H2의 `HERO_ACCOUNT`, `HERO_CHARACTER` 테이블에 저장되고, 비밀번호는 BCrypt 해시로 저장됩니다. 회원가입 계정은 `USER` 역할이며 가입 후 자동 로그인됩니다. 계정마다 캐릭터를 하나 만들 수 있고, 일반 계정은 본인 캐릭터 문서와 회의·간식 당번·프로젝트 팀 문서를 수정할 수 있습니다. 캐릭터 직급이 팀장 또는 상무이면 공지도 작성할 수 있습니다. `ADMIN`은 모든 문서를 수정할 수 있습니다.
-
-DB에 `admin` 계정이 없으면 서버 시작 시 데모 관리자 `admin` / `admin`을 생성합니다. H2 파일 DB를 사용하므로 계정은 서버 재시작 후에도 유지되며, 이 계정도 자동 초기화되지 않습니다.
-
-`application.properties`의 기본 설정은 개발용이며, 현재 화면/API에는 관리자 비밀번호 변경 기능이 없습니다. 운영 환경에 노출하기 전에 데모 관리자 자동 생성 로직과 계정 구성을 안전한 방식으로 교체하고, 세션 보안·HTTPS·CSRF 보호 정책을 별도로 구성하세요. 개발용 H2 콘솔도 운영에서는 비활성화해야 합니다.
-
-## H2 → Oracle 로 바꾸기
-
-1. `pom.xml` 의 `h2` 의존성을 지우고 추가
-   ```xml
-   <dependency>
-     <groupId>com.oracle.database.jdbc</groupId>
-     <artifactId>ojdbc11</artifactId>
-     <scope>runtime</scope>
-   </dependency>
-   ```
-2. `application.properties`
-   ```
-   spring.datasource.url=jdbc:oracle:thin:@//호스트:1521/서비스명
-   spring.datasource.driver-class-name=oracle.jdbc.OracleDriver
-   spring.datasource.username=...
-   spring.datasource.password=...
-   spring.sql.init.mode=never
-   spring.h2.console.enabled=false
-   ```
-3. 현재 `docs/oracle-ddl.sql`은 `HERO_DOC`만 생성합니다. 애플리케이션은 `HERO_ACCOUNT`, `HERO_CHARACTER`도 사용하므로 이 두 테이블의 Oracle DDL을 추가로 작성·실행해야 합니다. 현재 상태 그대로는 Oracle에서 애플리케이션을 시작할 수 없습니다.
-4. DDL과 드라이버 설정 후 Oracle을 대상으로 시작 및 API 테스트를 별도로 검증해야 합니다. 문서 SQL은 `UPDATE` 후 없으면 `INSERT`하며, Oracle/H2 호환 여부는 실제 Oracle 검증이 필요합니다.
-
-## H2 사용 팁
-
-- 데이터 파일: `./data/herodb.mv.db` (프로젝트 폴더 아래 `data/`)
-- 웹 콘솔: http://localhost:8080/h2-console → JDBC URL `jdbc:h2:file:./data/herodb`, 사용자 `sa`, 비밀번호 없음
-- `data/` 폴더를 삭제하면 문서·계정·캐릭터 DB가 초기화됩니다. 다음 시작 시 데모 관리자 계정이 다시 생성됩니다. 삭제 전 서버를 종료하세요.
-
-## 문제가 생기면
-
-| 증상 | 확인 |
+| 증상 | 확인할 내용 |
 |---|---|
-| `mvn` 이 의존성을 못 받음 | 사내 Maven 미러 설정(settings.xml) |
-| 화면은 뜨는데 저장이 안 됨 | 브라우저 개발자도구(F12) Network에서 `/api/…` 응답 코드 확인. 일반 계정은 본인 캐릭터 문서만 수정할 수 있고, 다른 컬렉션은 관리자 권한이 필요합니다. |
-| `Invalid bean definition` / MyBatis 매핑 오류 | `DocMapper.xml` 의 namespace 와 `DocRow` 패키지 경로 |
-| Oracle에서 시작 실패 | Oracle DDL에 `HERO_DOC`, `HERO_ACCOUNT`, `HERO_CHARACTER` 세 테이블이 모두 있는지 확인. 현재 제공 DDL에는 `HERO_DOC`만 포함되어 있습니다. |
-| 한글이 깨짐 | 파일 인코딩 UTF-8 (Eclipse: Window > Preferences > General > Workspace > Text file encoding) |
+| Maven이 의존성을 받지 못함 | 인터넷 연결 또는 Maven `settings.xml`의 사내 미러 설정 |
+| 서버가 8080 포트를 열지 못함 | 다른 프로세스가 포트를 사용하는지 확인하거나 `PORT` 환경 변수 설정 |
+| 로그인이 되지 않음 | 계정·비밀번호를 확인하고, DB가 정상적으로 연결되었는지 서버 로그 확인 |
+| 저장 시 `403` 응답 | 현재 계정이 해당 캐릭터의 소유자인지, 작업에 관리자 또는 팀장·상무 권한이 필요한지 확인 |
+| 화면이 갱신되지 않음 | 개발자 도구의 Network 탭에서 `/api/docs`, `/api/events`와 폴링 요청의 응답 확인 |
+| DB 연결 또는 테이블 오류 | JDBC URL·드라이버·계정과 `schema.sql` 초기화 로그 확인 |
+| 한글이 깨짐 | 파일 인코딩을 UTF-8로 설정 |
 
-## 앞으로 개선할 만한 것
+## 운영 전 확인 사항
 
-- 채팅처럼 쌓이는 데이터는 별도 테이블로 분리 (지금은 한 테이블에 JSON)
-- 서버에서 변경 이력(누가 언제 바꿨는지) 저장
-- Oracle용 `HERO_ACCOUNT`, `HERO_CHARACTER` DDL 추가 및 Oracle 통합 검증
-- 기본 관리자 계정의 안전한 초기 설정과 운영용 인증·CSRF 정책 구성
+- 개발 기본값인 `admin` / `admin` 데모 계정 생성을 운영 환경에 그대로 두지 마세요. 현재 화면에는 관리자 비밀번호 변경 기능이 없습니다.
+- 기본 Spring Security 설정은 CSRF를 비활성화하고 있습니다. 외부에 공개하기 전에 인증·세션·CSRF·HTTPS 정책을 검토하세요.
+- 운영 환경에서는 H2 콘솔을 비활성화하고, 영속성이 보장되는 데이터베이스와 안전한 비밀 변수 설정을 사용하세요.
+- Render/Docker 빌드는 테스트를 실행하지 않으므로 배포 전 빌드와 테스트를 별도로 확인하세요.

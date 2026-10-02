@@ -55,7 +55,8 @@
   <header>
     <div class="hrow"><div class="eyebrow">Multiverse</div><div class="theme-controls"><div class="sides themebar" id="themebar" role="group" aria-label="화면 모드"><button type="button" class="side" data-t="dark" aria-pressed="true">다크</button><button type="button" class="side" data-t="light" aria-pressed="false">라이트</button></div><div class="sides worldthemebar" id="world-themebar" role="group" aria-label="맵 테마"><button type="button" class="side" data-world-theme="office" aria-pressed="true">사무실</button><button type="button" class="side" data-world-theme="battlefield" aria-pressed="false">전장</button><button type="button" class="side" data-world-theme="space" aria-pressed="false">우주</button></div><button type="button" id="bgm-toggle" class="bgm-toggle" aria-pressed="true">BGM 켜짐</button></div></div>
     <h1><em>멀티버스</em></h1>
-    <p class="lede"><span>프론트와 백오피스, 두 개의 차원에서 <span id="total"></span>명의 영웅이 서비스를 지킵니다.</span><span>차원과 유니버스를 고르거나 이름과 스킬로 검색해서 동료를 만나보세요.</span></p>
+    <span id="total" hidden></span>
+    <p class="lede"><span id="lede-first"></span><span id="lede-second"></span></p>
     <div class="accountbar"><span id="account-name"></span><button type="button" id="logout-button" aria-label="로그아웃">로그아웃</button></div>
   </header>
 
@@ -94,14 +95,14 @@
       <label id="boss-visit-control"><input type="checkbox" id="boss-visit"> 사장님 등장</label>
       <span class="cfgline">점심 <input type="time" id="cfgls" value="12:00" aria-label="점심 시작"> ~ <input type="time" id="cfgle" value="13:00" aria-label="점심 끝"> · 퇴근 <input type="time" id="cfgoe" value="18:00" aria-label="퇴근 시간"> <span class="jstatus" id="cfgst" role="status"></span></span>
       <span id="otcount" class="otcount"></span>
-      <div class="legend" id="legend" aria-label="팀별 책상 색"></div>
-      <span id="map-guide">캐릭터 시트의 「자리」에서 빈 좌석을 선택할 수 있어요. 다른 캐릭터가 고른 좌석은 선택할 수 없고, 오전 9시부터 퇴근 설정 시간까지 「업무중」 상태인 캐릭터는 자기 책상에 앉아요. 점심·휴식·회의·연차 중에는 자리를 비웁니다.</span>
+      <div class="legend" id="legend" aria-label="팀별 색상"></div>
+      <span id="map-guide" class="copy-text"></span>
     </div>
   </section>
 
   <section class="pane" id="meetpane" aria-label="작전 회의" hidden>
     <h2>작전 회의</h2>
-    <p id="meeting-guide">회의 이름과 참석자를 정하면 지도 아래쪽 회의실 테이블에 표시돼요. 회의가 끝나면 각자 자리로 돌아가고, 연차인 사람은 참석할 수 없어요. 테이블은 3개이며 각 회의에 최대 8명까지 참석할 수 있어요.</p>
+    <p id="meeting-guide" class="copy-text"></p>
     <div class="pform">
       <div class="jrow"><input id="mname" type="text" maxlength="30" placeholder="회의 이름 (예: 주간 이슈 점검)" aria-label="회의 이름"><button type="button" id="msave" class="jsave">회의 만들고 시작</button><button type="button" id="mcancelbtn" hidden>수정 취소</button></div>
       <div class="mlabel" style="margin-top:12px">참석자 <span id="mpc"></span></div>
@@ -113,7 +114,7 @@
 
   <section class="pane" id="projpane" aria-label="용병단" hidden>
     <h2>용병단</h2>
-    <p>외부에서 프로젝트 팀이 합류하면 팀을 만들고 명단을 추가하세요. 팀마다 지도에 전용 공간이 생기고, 팀 이름은 언제든 바꿀 수 있어요. 최대 3팀까지 만들 수 있어요.</p>
+    <p id="project-guide" class="copy-text"></p>
     <div class="pform">
       <div class="jrow"><input id="pname" type="text" maxlength="16" placeholder="프로젝트 팀 이름 (예: 차세대 결제 TF)" aria-label="프로젝트 팀 이름"><button type="button" id="padd" class="jsave">프로젝트 팀 만들기</button></div>
       <div class="mlabel project-hero-label">기존 영웅을 팀에 합류시키기 (선택)</div>
@@ -125,7 +126,7 @@
 
   <section class="pane" id="snackpane" aria-label="보급 담당" hidden>
     <h2>보급 담당</h2>
-    <p>이번 기간에 간식을 챙길 팀과 먹을거리를 정해두세요. 기간 안에는 지도의 팀 구역에 먹을거리 아이템이 나타나고, 팀 카드와 팀원 시트에도 표시돼요.</p>
+    <p id="snack-guide" class="copy-text"></p>
     <div class="pform">
       <div class="mlabel">담당팀</div><div class="recs" id="steams"></div>
       <div class="jrow dates"><label class="dl">시작 <input id="sfrom" type="date"></label><label class="dl">종료 <input id="sto" type="date"></label></div>
@@ -145,7 +146,7 @@
       <button type="button" class="chat-mode" data-chat-mode="private" role="tab" aria-selected="false">개인·그룹 채팅 <b id="private-badge" class="private-badge" hidden></b></button>
     </div>
     <section id="notice-pane" class="chatbox" aria-label="공지">
-      <p>공지 내용은 모든 사용자에게 표시됩니다. 팀장·상무급 캐릭터와 관리자만 작성할 수 있습니다.</p>
+      <p id="notice-guide" class="copy-text"></p>
       <div class="clist" id="clist" role="log" aria-live="polite"></div>
       <div class="pform cform">
         <div class="jrow"><select id="cwho" aria-label="공지 작성 캐릭터"></select><input id="cin" type="text" maxlength="200" placeholder="공지 내용을 입력하세요 (Enter)" aria-label="공지 내용" autocomplete="off"><button type="button" id="csend" class="jsave">공지 등록</button></div>
@@ -170,8 +171,8 @@
 
   <section class="pane" id="teampane" aria-label="멤버" hidden>
     <h2>영웅 모집</h2>
-    <p>처음에는 불꽃토끼만 있어요. 편집 권한이 있는 사람이 닉네임과 소속(대분류 > 소분류)을 입력해서 멤버를 추가하면 지도와 명단에 나타나요. 소분류, 직급, 직업은 비워 둬도 되고, 나중에 캐릭터 시트에서 바꿀 수 있어요.</p>
-    <p class="tempty" id="teamnote" hidden>이 페이지의 편집 권한이 있는 사람만 멤버를 추가하거나 뺄 수 있어요.</p>
+    <p id="team-guide" class="copy-text"></p>
+    <p class="tempty copy-text" id="teamnote" hidden></p>
     <div class="pform admin-character-form" id="admin-character-form" hidden>
       <div class="mlabel">관리자 · 계정에 캐릭터 매핑</div>
       <div class="jrow"><select id="admin-character-account" aria-label="캐릭터를 연결할 계정"></select><input id="admin-character-name" type="text" maxlength="30" placeholder="캐릭터 이름" aria-label="캐릭터 이름"><select id="admin-character-universe" aria-label="캐릭터 유니버스"><option value="member">프론트 회원</option><option value="order">프론트 주문</option><option value="display">프론트 전시</option><option value="broadcast">프론트 알림</option><option value="curation">프론트 큐레이션</option><option value="fgen">프론트</option><option value="bord">백오피스 주문</option><option value="bprod">백오피스 상품</option><option value="blog">백오피스 물류</option><option value="bsettle">백오피스 정산</option><option value="bgen">백오피스</option></select><button type="button" id="admin-character-create" class="jsave">캐릭터 생성</button></div>
@@ -188,7 +189,21 @@
 
   <main class="grid" id="grid" hidden></main>
 
-  <p class="note"><span>닉네임과 직급은 멤버를 추가할 때 입력하고, 스탯과 레벨은 화면 구성을 위한 임시 설정이며 스탯은 시트의 「스탯」에서 각자 조정할 수 있습니다.</span><span>직업과 직급은 캐릭터 시트의 「직업 바꾸기」「직급」에서 바꿀 수 있고, 맡은 업무·근태·전출·자리도 시트에서 관리합니다.</span><span>회의, 프로젝트 팀, 간식 담당팀, 채팅, 멤버 추가는 위쪽 탭에서 사용합니다.</span></p>
+  <p class="note" aria-label="사용 안내">
+    <span id="footer-guide-1" class="copy-text"></span>
+    <span id="footer-guide-2" class="copy-text"></span>
+    <span id="footer-guide-3" class="copy-text"></span>
+  </p>
+  <section id="copy-admin" class="copy-admin" hidden aria-label="사이트 안내 문구 편집">
+    <details>
+      <summary>관리자 · 사이트 안내 문구 편집</summary>
+      <p>안내 문구를 수정하고 저장하면 모든 사용자에게 표시됩니다. 줄바꿈도 입력할 수 있습니다.</p>
+      <form id="copy-admin-form">
+        <div id="copy-admin-fields"></div>
+        <div class="jrow"><button type="submit" class="jsave">안내 문구 저장</button><span id="copy-admin-status" class="jstatus" role="status"></span></div>
+      </form>
+    </details>
+  </section>
   <a class="screen-switch" href="https://m.hnsmall.com/" target="_blank" rel="noopener noreferrer" aria-label="홈앤쇼핑 모바일 사이트 새 창으로 열기">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/></svg>
     <span>홈앤쇼핑 열기</span>
@@ -201,6 +216,6 @@
 
 <script src="js/auth.js?v=20261002-2"></script>
 <script src="js/db-adapter.js"></script>
-<script src="js/app.js?v=20261002-16"></script>
+<script src="js/app.js?v=20261002-19"></script>
 
 </body></html>
