@@ -452,33 +452,54 @@ function seatEditor(d) {
   DATA.forEach(function (m) { var sd = deskFor(m); if (sd) occ[sd.idx] = m; });
   SEATS.forEach(function (s) {
     if (s.kind !== "person") {
-      h += '<button type="button" class="sw pc" disabled aria-label="PC 전용 자리 ' + esc(s.n) + '"><span>PC</span><b>' + esc(s.n) + "</b></button>";
+      h += '<button type="button" class="sw pc" disabled aria-label="임시 사용 PC ' + esc(s.n) + '"><span>PC</span><b>' + esc(s.n) + "</b></button>";
       return;
     }
     var o = occ[s.idx], isCur = !!cur && s.idx === cur.idx;
     var pos = (s.row + 1) + "-" + (s.col + 1), spoken = (s.row + 1) + "행 " + (s.col + 1) + "열";
     h += '<button type="button" class="sw' + (isCur ? " cur" : "") + (o ? " occupied" : " vac") + '" data-s="' + s.idx + '"' + (isCur || o ? " disabled" : "") + ' title="' + spoken + '" aria-label="' + (isCur ? "내 좌석, " : o ? "사용 중, " : "빈 자리, ") + spoken + '">' + (isCur ? "내 자리 " : o ? "점유 " : "") + pos + "</button>";
   });
-  return '<div class="jobedit" id="seatpanel" hidden><div class="mlabel">좌석 선택 — 빈 자리만 선택할 수 있어요</div><div class="recs">' + h + "</div>" +
+  return '<div class="jobedit" id="seatpanel" hidden><div class="mlabel">빈 직원 좌석은 여기서 지정하고, FTP·ER 전용 PC는 지도에서 잠시 사용할 수 있어요</div><div class="recs">' + h + "</div>" +
     '<div class="jrow"><button type="button" class="sreset">자리 비우기</button><button type="button" class="jcancel panel-close" aria-label="닫기">✕</button></div>' +
     '<div class="jstatus" role="status"></div></div>';
 }
-function saveSeat(i, tIdx) {
-  var d = DATA[i], cur = deskFor(d), target = typeof tIdx === "number" ? SEATS[tIdx] : null, ov = {}, src = store.seats && store.seats.main && store.seats.main.m ? store.seats.main.m : {};
+function saveSeat(i, tIdx, keepSheet) {
+  var d = DATA[i], cur = deskFor(d), target = typeof tIdx === "number" ? SEATS[tIdx] : null;
   if (!d || (tIdx !== null && (!target || target.kind !== "person")) || (cur && cur.idx === tIdx)) return;
   if (target && DATA.some(function (m) { var sd = deskFor(m); return m !== d && sd && sd.idx === target.idx; })) {
     var status = document.querySelector("#seatpanel .jstatus");
     if (status) status.textContent = "이미 다른 캐릭터가 선택한 자리예요.";
+    else if (target.kind === "pc") window.alert("이 PC는 이미 다른 캐릭터가 사용 중입니다.");
     return;
   }
   if (target && WORLD_THEME === "office" && !window.confirm((target.row + 1) + "행 " + (target.col + 1) + "열 자리를 지정하시겠습니까?")) return;
-  Object.keys(src).forEach(function (k) { ov[k] = src[k]; });
-  if (target) ov[jobId(d)] = target.idx; else delete ov[jobId(d)];
-  commit("seats", "main", Object.keys(ov).length ? { m: ov } : null, function () { applySeats(false); syncIntruders(false); openSheet(i, null); }, "#seatpanel .jstatus");
+  commit("seats", jobId(d), { override: true, s: target ? target.idx : null, pc: null }, function () { applySeats(false); syncIntruders(false); if (keepSheet !== false) openSheet(i, null); }, "#seatpanel .jstatus");
 }
 function resetSeat(i) {
   if (!deskFor(DATA[i])) { hideEditor(); return; }
   saveSeat(i, null);
+}
+function pcUseOf(d) {
+  var seatState = store.seats[jobId(d)], index = seatState && seatState.pc;
+  return typeof index === "number" && SEATS[index] && SEATS[index].kind === "pc" ? SEATS[index] : null;
+}
+function setPcUse(i, seatIdx) {
+  var d = DATA[i], target = typeof seatIdx === "number" ? SEATS[seatIdx] : null, curPc = pcUseOf(d), assigned = deskFor(d), nextPc;
+  if (!d || target && target.kind !== "pc") return;
+  nextPc = target && curPc && curPc.idx === target.idx ? null : target;
+  if (nextPc && DATA.some(function (m) { return m !== d && pcUseOf(m) && pcUseOf(m).idx === nextPc.idx; })) {
+    window.alert(nextPc.n.toUpperCase() + " 전용 PC는 현재 다른 캐릭터가 사용 중입니다.");
+    return;
+  }
+  if (nextPc && WORLD_THEME === "office" && !window.confirm(nextPc.n.toUpperCase() + " 전용 PC를 잠시 사용하시겠습니까?")) return;
+  commit("seats", jobId(d), {
+    override: true,
+    s: assigned && assigned.kind === "person" ? assigned.idx : null,
+    pc: nextPc ? nextPc.idx : null
+  }, function () {
+    applySeats(false);
+    syncMeetings(false);
+  }, null);
 }
 function attMode() { var b = document.querySelector("#attpanel .att[aria-pressed=true]"); return b ? b.dataset.a : "in"; }
 function setAtt(a) {
@@ -785,6 +806,12 @@ function computeSeatNow() {
   var ov = store.seats && store.seats.main && store.seats.main.m && typeof store.seats.main.m === "object" ? store.seats.main.m : {}, taken = {}, visit = WORLD_THEME === "office" && bossVisitOn();
   SEATNOW = {};
   DATA.forEach(function (d) {
+    var personal = store.seats[jobId(d)], s = personal && personal.override === true && typeof personal.s === "number" ? SEATS[personal.s] : null;
+    if (personal && personal.override === true && s && s.kind === "person" && !taken[s.idx]) { taken[s.idx] = 1; SEATNOW[jobId(d)] = s; }
+  });
+  DATA.forEach(function (d) {
+    var personal = store.seats[jobId(d)];
+    if (personal && personal.override === true) return;
     if (visit && !shouldSitAtDesk(d)) return;
     var idx = ov[jobId(d)], s = typeof idx === "number" ? SEATS[idx] : null;
     if (s && s.kind === "person" && !taken[s.idx]) { taken[s.idx] = 1; SEATNOW[jobId(d)] = s; }
@@ -1332,7 +1359,7 @@ function applySeats(initial) {
     if (nh === w.hd) return;
     w.hd = nh;
     if (w.mode === "leave") { sp = leaveSpot(w); w.route = []; w.moving = false; w.x = sp[0]; w.y = sp[1]; w.tx = w.x; w.ty = w.y; return; }
-    if (w.mode === "gone" || w.mode === "away" || w.seat) return;
+    if (w.mode === "gone" || w.mode === "away" || w.mode === "pc" || w.seat) return;
     dest = homeDest(w);
     if (initial || reduceMotion) jump(w, dest); else goTo(w, dest);
   });
@@ -1346,6 +1373,7 @@ var walkers = DATA.map(function (d, i) { return newWalker(d, i); });
 function homeDest(w) { return w.hd && shouldSitAtDesk(DATA[w.i]) ? [w.hd.x, w.hd.y] : w.a ? randIn(w.a) : (STAND[DATA[w.i].n] || [w.x, w.y]); }
 function leaveSpot(w) { return w.hd ? [w.hd.cx - CW / 2, w.hd.ry + 66] : (STAND[DATA[w.i].n] || [w.x, w.y]); }
 function isSitting(w) { return !w.route.length && !w.seat && w.mode === "desk" && w.hd && shouldSitAtDesk(DATA[w.i]) && Math.abs(w.x - w.hd.x) < 1.5 && Math.abs(w.y - w.hd.y) < 1.5; }
+function isUsingPc(w) { return w.mode === "pc" && !!w.pc && !w.route.length; }
 function rowOfY(y) { return Math.max(0, Math.min(5, Math.floor((y - OY) / ROWH))); }
 function wtop(r) { return OY + r * ROWH + 66; }
 function zoneOf(x, y) { return x >= EDGE - 10 ? "meet" : (y >= LOWER_Y ? "low" : "off"); }
@@ -1449,17 +1477,19 @@ function syncMeetings(initial) {
   if (WORLD_THEME !== "office") walkers.forEach(function (w) { var d0 = DATA[w.i]; if (!seats[w.id] && !onLeave(d0, today) && !isGone(d0, now) && presenceOf(d0, now) === "lunch") lunchers.push(w.id); });
   lunchers.sort(); LUNCH.n = lunchers.length;
   walkers.forEach(function (w) {
-    var d = DATA[w.i], s = seats[w.id], mode, tag = "", key, quick = initial || reduceMotion || w.mode === "gone", sp, h, t2;
+    var d = DATA[w.i], s = seats[w.id], pc = pcUseOf(d), mode, tag = "", key, quick = initial || reduceMotion || w.mode === "gone", sp, h, t2;
     if (onLeave(d, today)) mode = "leave";
     else if (isGone(d, now)) mode = "gone";
     else if (s) mode = "meet";
+    else if (WORLD_THEME === "office" && pc) mode = "pc";
     else { tag = presenceOf(d, now); mode = tag ? "away" : "desk"; }
-    key = WORLD_THEME + ":" + mode + ":" + (mode === "meet" ? s.k + ":" + s.x + ":" + s.y : "") + tag + (shouldSitAtDesk(d, now) ? ":working" : ":off-desk") + (mode === "away" && tag === "lunch" ? ":" + lunchers.indexOf(w.id) + "/" + lunchers.length : "");
+    key = WORLD_THEME + ":" + mode + ":" + (mode === "meet" ? s.k + ":" + s.x + ":" + s.y : mode === "pc" ? pc.idx : "") + tag + (shouldSitAtDesk(d, now) ? ":working" : ":off-desk") + (mode === "away" && tag === "lunch" ? ":" + lunchers.indexOf(w.id) + "/" + lunchers.length : "");
     if (w.pkey === key) return;
-    w.pkey = key; w.mode = mode; w.tag = tag; w.seat = mode === "meet" ? s : null;
+    w.pkey = key; w.mode = mode; w.tag = tag; w.seat = mode === "meet" ? s : null; w.pc = mode === "pc" ? pc : null;
     if (mode === "gone") { w.route = []; w.moving = false; w.seat = null; }
     else if (mode === "leave") { sp = leaveSpot(w); w.route = []; w.moving = false; w.x = sp[0]; w.y = sp[1]; w.tx = w.x; w.ty = w.y; }
     else if (mode === "meet") { if (quick) jump(w, [s.x, s.y]); else goTo(w, [s.x, s.y]); }
+    else if (mode === "pc") { t2 = [pc.x, pc.y]; if (quick) jump(w, t2); else goTo(w, t2); }
     else if (mode === "away") { t2 = tag === "lunch" && WORLD_THEME !== "office" ? lunchSpot(lunchers.indexOf(w.id), lunchers.length) : awayDest(); if (quick) jump(w, t2); else goTo(w, t2); }
     else { h = homeDest(w); if (quick) jump(w, h); else goTo(w, h); }
   });
@@ -1480,6 +1510,7 @@ function update(dt) {
       return;
     }
     if (w.mode === "meet" || w.seat) { w.moving = false; return; }
+    if (w.mode === "pc") { w.moving = false; return; }
     if (w.mode === "away") {
       w.moving = false;
       if (w.tag === "lunch" || w.tag === "away") return;
@@ -1726,11 +1757,12 @@ function draw() {
     mctx.font = "500 11px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif";
     label(info ? fit(mctx, info.t, 112) : WORLD_THEME === "office" ? "빈 회의실" : "빈 작전 탁자", tb.x, tb.y + 82, !info);
   });
-  var showNames = document.getElementById("names").checked, today = todayStr(), owner = {};
+  var showNames = document.getElementById("names").checked, today = todayStr(), owner = {}, pcOwner = {};
   walkers.forEach(function (w) { if (w.hd) owner[w.hd.idx] = w; });
+  walkers.forEach(function (w) { if (isUsingPc(w)) pcOwner[w.pc.idx] = w; });
   SEATS.forEach(function (s) {
     if (WORLD_THEME !== "office") return;
-    var w = owner[s.idx], d = w ? DATA[w.i] : null, sit = w ? isSitting(w) : false, on = d ? mapOn(d) : true, off = d ? onLeave(d, today) : false;
+    var w = s.kind === "pc" ? pcOwner[s.idx] : owner[s.idx], d = w ? DATA[w.i] : null, sit = w ? (s.kind === "pc" ? isUsingPc(w) : isSitting(w)) : false, on = d ? mapOn(d) : true, off = d ? onLeave(d, today) : false;
     var tint = d ? ucol(uOf(d)) : "#5b638f", nm = d ? jobId(d) : "";
     mctx.globalAlpha = on ? 1 : 0.28;
     if (d && on && (uOf(d) === "flead" || uOf(d) === "blead")) {
@@ -1751,12 +1783,12 @@ function draw() {
     }
     if (sit && on && d && isOT(d)) otBadge(s.cx + 18, s.ry + 2);
     if (!d && s.kind !== "person") label(s.n, s.cx, s.ry + 9, true);
-    else if (d && on && (showNames || hover === w)) label(nameLines(d, off ? " · " + offLabel(d) : ""), s.cx, s.y - 4, off);
+    else if (d && on && (showNames || hover === w || w.mode === "pc")) label(nameLines(d, off ? " · " + offLabel(d) : ""), s.cx, s.y - 4, off);
     if (sit && on && d) drawHealthBattery(s.x, s.y, d, 32);
     if (sit && on && hover === w) arrow(s.cx, s.y - 20);
   });
   walkers.slice().sort(function (a, b) { return a.y - b.y; }).forEach(function (w) {
-    if (isSitting(w)) return;
+    if (isSitting(w) || isUsingPc(w)) return;
     var d = DATA[w.i], on = mapOn(d), off = onLeave(d, today), gn = w.mode === "gone";
     var ph = Math.floor(w.anim * 5), fr = w.moving ? (ph % 2 ? 1 : 2) : 0, bob = w.moving && ph % 2 ? 2 : 0;
     var x = Math.round(w.x), y = Math.round(w.y) - bob, sitting = w.seat && !w.route.length;
@@ -1813,6 +1845,31 @@ function mapCommandAt(point) {
   if (point[0] >= 16 && point[0] <= 944 && point[1] >= 716 && point[1] <= 958) return "proj";
   return null;
 }
+function pcSeatAt(px, py) {
+  if (WORLD_THEME !== "office") return null;
+  for (var i = 0; i < SEATS.length; i++) {
+    var s = SEATS[i];
+    if (s.kind === "pc" && px >= s.cx - 42 && px <= s.cx + 42 && py >= s.ry - 8 && py <= s.ry + 66) return s;
+  }
+  return null;
+}
+function currentCharacterIndex() {
+  var i = currentCharacterId ? indexOfId(currentCharacterId) : -1;
+  return i >= 0 && DATA[i].accountCharacter ? i : -1;
+}
+function assignedSeatAt(px, py) {
+  if (WORLD_THEME !== "office") return null;
+  var i = currentCharacterIndex(), d = i >= 0 ? DATA[i] : null, assigned = d && pcUseOf(d) ? deskFor(d) : null;
+  if (!assigned || assigned.kind !== "person" || px < assigned.cx - 42 || px > assigned.cx + 42 || py < assigned.ry - 8 || py > assigned.ry + 66) return null;
+  return { index: i, seat: assigned };
+}
+function pcUserAt(seat) {
+  for (var i = 0; i < DATA.length; i++) {
+    var user = pcUseOf(DATA[i]);
+    if (user && user.idx === seat.idx) return DATA[i];
+  }
+  return null;
+}
 function hitTest(ev) {
   var pt = mapPoint(ev), px = pt[0], py = pt[1], hit = null;
   walkers.forEach(function (w) {
@@ -1843,13 +1900,21 @@ function hitInv(ev) {
 }
 function indexOfId(id) { for (var k = 0; k < DATA.length; k++) if (jobId(DATA[k]) === id) return k; return -1; }
 mapEl.addEventListener("mousemove", function (ev) {
-  var command = mapCommandAt(mapPoint(ev)), hi0 = hitInv(ev), h = hi0 ? null : hitTest(ev), tip = document.getElementById("tip"), br = document.getElementById("worldbox").getBoundingClientRect(), hi = hi0;
+  var point = mapPoint(ev), command = mapCommandAt(point), pc = pcSeatAt(point[0], point[1]), returnSeat = !pc && assignedSeatAt(point[0], point[1]), hi0 = pc || command || returnSeat ? null : hitInv(ev), h = pc || command || returnSeat || hi0 ? null : hitTest(ev), tip = document.getElementById("tip"), br = document.getElementById("worldbox").getBoundingClientRect(), hi = hi0;
   hover = h; hoverInv = hi; mapEl.style.cursor = h || hi ? "pointer" : "default";
   if (command) {
     mapEl.style.cursor = "pointer";
     tip.innerHTML = command === "meet"
       ? (WORLD_THEME === "space" ? "<b>우주 관제소</b> · 눌러서 회의를 만들어요" : WORLD_THEME === "office" ? "<b>회의실</b> · 눌러서 회의를 만들어요" : "<b>작전 막사</b> · 눌러서 회의를 만들어요")
       : (WORLD_THEME === "space" ? "<b>우주항</b> · 눌러서 프로젝트 팀을 만들어요" : WORLD_THEME === "office" ? "<b>프로젝트 구역</b> · 눌러서 팀을 만들어요" : "<b>용병 진영</b> · 눌러서 프로젝트 팀을 만들어요");
+  } else if (pc) {
+    var pcUser = pcUserAt(pc), activeIndex = currentCharacterIndex(), activePc = activeIndex >= 0 && pcUseOf(DATA[activeIndex]);
+    var isOwnPc = activePc && activePc.idx === pc.idx;
+    mapEl.style.cursor = "pointer";
+    tip.innerHTML = "<b>" + esc(pc.n.toUpperCase()) + " 전용 PC</b>" + (isOwnPc ? "<br>다시 클릭하면 원래 자리로 돌아가요" : pcUser ? "<br>사용 중 · " + nameHtml(pcUser.n) : "<br>클릭하여 잠시 사용해요");
+  } else if (returnSeat) {
+    mapEl.style.cursor = "pointer";
+    tip.innerHTML = "<b>내 지정 좌석</b> · 클릭하여 원래 자리로 돌아가요";
   } else if (h) {
     var d = DATA[h.i], sk = snackNow()[uOf(d)];
     tip.innerHTML = "<b>" + nameHtml(d.n) + "</b>" + (ttl(d) ? " · " + esc(ttl(d)) : "") + "<br>" + esc(job(d)) + (onLeave(d) ? "<br>" + esc(offLabel(d)) : "") + (h.seat && !h.route.length ? "<br>회의 중" : "") + (h.mode === "away" ? "<br>" + (h.tag === "lunch" ? (WORLD_THEME === "space" ? "우주식량 중" : "점심 중") : h.tag === "break" ? "휴식 중" : "자리비움") : "") + (openTasks(d).length ? "<br>맡은 업무 " + openTasks(d).length + "건" : "") + (sk ? "<br>간식 당번 · " + esc(sk.items.join(", ")) : "");
@@ -1867,11 +1932,26 @@ mapEl.addEventListener("mousemove", function (ev) {
 });
 mapEl.addEventListener("mouseleave", function () { hover = null; hoverInv = null; document.getElementById("tip").hidden = true; });
 mapEl.addEventListener("click", function (ev) {
-  var command = mapCommandAt(mapPoint(ev));
+  var point = mapPoint(ev), command = mapCommandAt(point);
   if (command) {
     setView(command);
     var input = document.getElementById(command === "meet" ? "mname" : "pname");
     if (input) input.focus();
+    return;
+  }
+  var pc = pcSeatAt(point[0], point[1]);
+  if (pc) {
+    var characterIndex = currentCharacterIndex();
+    if (characterIndex < 0) {
+      window.alert("이 PC를 사용하려면 로그인 계정에 연결된 캐릭터가 필요합니다.");
+      return;
+    }
+    setPcUse(characterIndex, pc.idx);
+    return;
+  }
+  var returnSeat = assignedSeatAt(point[0], point[1]);
+  if (returnSeat) {
+    setPcUse(returnSeat.index, null);
     return;
   }
   var hi = hitInv(ev), pi = hi ? indexOfId(hi.pid) : -1;
@@ -2525,9 +2605,9 @@ function syncOfficeCopy() {
   if (projectTitle) projectTitle.textContent = office ? "프로젝트 팀" : "용병단";
   if (meetingTitle) meetingTitle.textContent = office ? "회의" : "작전 회의";
   if (snackTitle) snackTitle.textContent = office ? "간식 담당" : "보급 담당";
-  if (mapGuide) mapGuide.textContent = office ? "49개 자리로 구성된 사무실이에요. 47개 직원 좌석과 두 번째 줄 첫 두 칸의 ftp, ER 전용 PC가 있어요. 직원 시트에서 빈 자리를 선택할 수 있고, 오전 9시부터 퇴근 설정 시간까지 업무중인 직원은 자기 책상에 앉아요. 점심에는 직원들이 모이지 않고 머리 위에 식사 아이콘만 표시돼요." : "캐릭터 시트의 「자리」에서 빈 좌석을 선택할 수 있어요. 다른 캐릭터가 고른 좌석은 선택할 수 없고, 오전 9시부터 퇴근 설정 시간까지 「업무중」 상태인 캐릭터는 자기 책상에 앉아요. 점심·휴식·회의·연차 중에는 자리를 비웁니다.";
+  if (mapGuide) mapGuide.textContent = office ? "49개 자리로 구성된 사무실이에요. 47개 직원 좌석과 두 번째 줄 첫 두 칸의 FTP, ER 전용 PC가 있어요. 빈 직원 좌석은 캐릭터 시트에서 지정하고, FTP·ER PC는 지도에서 클릭해 잠시 사용할 수 있어요. PC 사용 중에도 기존 지정 좌석과 닉네임은 유지되며, 본인 좌석을 클릭하면 돌아갑니다. 오전 9시부터 퇴근 설정 시간까지 업무중인 직원은 자기 책상에 앉아요. 점심에는 직원들이 모이지 않고 머리 위에 식사 아이콘만 표시돼요." : "캐릭터 시트의 「자리」에서 빈 좌석을 선택할 수 있어요. 다른 캐릭터가 고른 좌석은 선택할 수 없고, 오전 9시부터 퇴근 설정 시간까지 「업무중」 상태인 캐릭터는 자기 책상에 앉아요. 점심·휴식·회의·연차 중에는 자리를 비웁니다.";
   if (meetingGuide) meetingGuide.textContent = office ? "사무실 오른쪽에 분리된 회의실 3개가 있어요. 회의 이름과 참석자를 정하면 지정된 회의실에 표시되고, 회의가 끝나면 각자 자리로 돌아갑니다. 연차인 직원은 참석할 수 없고, 회의실마다 최대 8명까지 참석할 수 있어요." : "회의 이름과 참석자를 정하면 지도 아래쪽 회의실 테이블에 표시돼요. 회의가 끝나면 각자 자리로 돌아가고, 연차인 사람은 참석할 수 없어요. 테이블은 3개이며 각 회의에 최대 8명까지 참석할 수 있어요.";
-  if (map) map.setAttribute("aria-label", office ? "49개 자리로 구성된 사무실. 47개 직원 좌석과 두 번째 줄의 ftp, ER 전용 PC가 있습니다." : "멀티버스 지도. 영웅 캐릭터가 움직이고, 회의실과 프로젝트 구역이 있습니다.");
+  if (map) map.setAttribute("aria-label", office ? "49개 자리로 구성된 사무실. 47개 직원 좌석과 두 번째 줄의 FTP, ER 전용 PC가 있습니다. FTP 또는 ER PC를 클릭해 잠시 사용하고, 본인 지정 좌석을 클릭해 돌아갈 수 있습니다." : "멀티버스 지도. 영웅 캐릭터가 움직이고, 회의실과 프로젝트 구역이 있습니다.");
   if (world) world.setAttribute("aria-label", office ? "사무실 지도" : "멀티버스 지도");
   syncBossVisitUI();
 }
@@ -2587,7 +2667,11 @@ if (window.claude && window.claude.use) {
     }, function () {});
     db.collection("seats").onSnapshot(function (snap) {
       var m = {};
-      snap.docs.forEach(function (x) { var v = x.data(); if (v && v.m && typeof v.m === "object") m[x.id] = { m: v.m }; });
+      snap.docs.forEach(function (x) {
+        var v = x.data();
+        if (v && v.m && typeof v.m === "object") m[x.id] = { m: v.m };
+        else if (v && v.override === true && (v.s === null || typeof v.s === "number" && v.s >= 0 && v.s < SEATS.length && Math.floor(v.s) === v.s) && (v.pc == null || typeof v.pc === "number" && v.pc >= 0 && v.pc < SEATS.length && Math.floor(v.pc) === v.pc && SEATS[v.pc].kind === "pc")) m[x.id] = { override: true, s: v.s, pc: typeof v.pc === "number" ? v.pc : null };
+      });
       store.seats = m;
       var first = !loaded.seats; loaded.seats = true;
       applySeats(first); syncIntruders(first);

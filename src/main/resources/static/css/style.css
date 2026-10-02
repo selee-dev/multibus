@@ -231,7 +231,8 @@ h1 em { font-style: normal; color: var(--gold); }
 #seatpanel .recs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); max-height: 260px; overflow-y: auto; }
 #seatpanel .recs button { min-width: 0; padding-inline: 2px; font-size: 11px; white-space: nowrap; }
 #seatpanel .sw.occupied:disabled { opacity: .58; text-decoration: line-through; }
-#seatpanel .sw.pc:disabled { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; background: var(--bg); color: var(--muted); border-style: solid; opacity: .82; text-decoration: none; font-size: 9px; }
+#seatpanel .sw.pc { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; background: var(--bg); border-style: solid; font-size: 9px; }
+#seatpanel .sw.pc:disabled { color: var(--muted); opacity: .82; text-decoration: none; }
 #seatpanel .sw.pc b { font-size: 10px; font-weight: 700; }
 .lead-note { color: var(--lead); font-weight: 700; }
 .jrow .asave { border-color: var(--c); color: var(--c); }
