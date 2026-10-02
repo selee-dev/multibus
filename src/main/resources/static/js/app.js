@@ -1,5 +1,48 @@
 /* 캐릭터 보드의 화면 상태, 데이터 렌더링, 편집 및 상호작용을 관리합니다. */
 var WORLD_THEME = document.documentElement.getAttribute("data-world-theme") === "space" ? "space" : "battlefield";
+var bgm = { context: null, gain: null, timer: null, step: 0, playing: false, enabled: true };
+try { bgm.enabled = localStorage.getItem("ops-bgm") !== "off"; } catch (e) {}
+function bgmButton() { return document.getElementById("bgm-toggle"); }
+function syncBgmButton() {
+  var button = bgmButton(); if (!button) return;
+  button.setAttribute("aria-pressed", String(bgm.enabled));
+  button.textContent = bgm.enabled ? "BGM 켜짐" : "BGM 꺼짐";
+}
+function bgmTick() {
+  if (!bgm.context || !bgm.gain || !bgm.playing) return;
+  var battlefield = [196, 247, 294, 330, 247, 220, 262, 330], space = [110, 165, 220, 147, 196, 247, 175, 220];
+  var notes = WORLD_THEME === "space" ? space : battlefield, frequency = notes[bgm.step % notes.length], now = bgm.context.currentTime;
+  var oscillator = bgm.context.createOscillator(), volume = bgm.context.createGain();
+  oscillator.type = WORLD_THEME === "space" ? "sine" : "triangle";
+  oscillator.frequency.setValueAtTime(frequency, now);
+  volume.gain.setValueAtTime(0.0001, now);
+  volume.gain.exponentialRampToValueAtTime(0.035, now + 0.06);
+  volume.gain.exponentialRampToValueAtTime(0.0001, now + 0.78);
+  oscillator.connect(volume); volume.connect(bgm.gain); oscillator.start(now); oscillator.stop(now + 0.82);
+  bgm.step++;
+}
+function startBgm() {
+  if (!bgm.enabled) return;
+  var AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+  if (!bgm.context) { bgm.context = new AudioContext(); bgm.gain = bgm.context.createGain(); bgm.gain.gain.value = 0.7; bgm.gain.connect(bgm.context.destination); }
+  if (bgm.context.state === "suspended") bgm.context.resume();
+  if (bgm.playing) return;
+  bgm.playing = true; bgm.step = 0; bgmTick(); bgm.timer = setInterval(bgmTick, 820);
+}
+function stopBgm() {
+  bgm.playing = false;
+  if (bgm.timer) { clearInterval(bgm.timer); bgm.timer = null; }
+}
+function toggleBgm() {
+  bgm.enabled = !bgm.enabled;
+  try { localStorage.setItem("ops-bgm", bgm.enabled ? "on" : "off"); } catch (e) {}
+  if (bgm.enabled) startBgm(); else stopBgm();
+  syncBgmButton();
+}
+function armBgm() { if (bgm.enabled) startBgm(); }
+document.addEventListener("pointerdown", armBgm, { once: true });
+document.addEventListener("keydown", armBgm, { once: true });
 var SIDE = {
   front: { name: "프론트" },
   back:  { name: "백오피스" },
@@ -25,10 +68,8 @@ var UNI = {
 };
 var STAT_LABELS = ["장애대응", "쿼리", "소통", "속도", "꼼꼼함"];
 
-/* DATA: n 이름, g 성별(f 여, m 남), t 직함, u 유니버스, c 직업, lv 레벨, s = [장애대응, 쿼리, 소통, 속도, 꼼꼼함], k 고유 스킬, kd 스킬 설명, q 대사 */
-var DATA = [
-  { n: "불꽃토끼", g: "f", t: "", u: "member", c: "동의 기록관", lv: 32, s: [96, 86, 82, 69, 77], k: "수신동의 관리", kd: "마케팅 수신 동의 항목을 채널별로 정확히 남긴다.", q: "동의한 만큼만 보냅니다." }
-];
+/* DATA: 서버에 등록된 캐릭터만 담습니다. */
+var DATA = [];
 
 var state = { side: null, uni: null, q: "", sort: "lv" };
 var lastFocus = null;
@@ -47,8 +88,7 @@ try { var rawJobs = localStorage.getItem("ops-jobs"); if (rawJobs) jobs = JSON.p
 try { var rawMv = localStorage.getItem("ops-moves"); if (rawMv) moves = JSON.parse(rawMv) || {}; } catch (e) { moves = {}; }
 try { var rawSt = localStorage.getItem("ops-status"); if (rawSt) leaves = JSON.parse(rawSt) || {}; } catch (e) { leaves = {}; }
 
-var OWNER_D = DATA[0]; OWNER_D.bn = OWNER_D.n; OWNER_D.id = "u" + hash(OWNER_D.n).toString(36);
-var BASE = DATA.length, INVCAP = 14;
+var INVCAP = 14;
 var PSLOTS = ["p1", "p2", "p3"];
 var store = { tasks: {}, meetings: {}, projects: {}, titles: {}, snacks: {}, stats: {}, health: {}, chat: {}, privateChats: {}, pres: {}, skills: {}, nicks: {}, cfg: {}, ot: {}, seats: {}, people: {} };
 var intr = [], invCount = {};
@@ -69,7 +109,6 @@ function makeMember(m) {
 }
 function extendData() {
   DATA.length = 0;
-  DATA.push(OWNER_D);
   peopleList().forEach(function (m) { DATA.push(makeMember(m)); });
   PSLOTS.forEach(function (k) {
     var p = store.projects[k], u = UNI[k];
@@ -106,6 +145,7 @@ function cfg() {
 function nowMin(now) { var t = new Date(now || Date.now()); return t.getHours() * 60 + t.getMinutes(); }
 function isOT(d) { var o = store.ot[jobId(d)]; return !!(o && o.d === todayStr()); }
 function isGone(d, now) { return nowMin(now) >= hmMin(cfg().oe) && !isOT(d); }
+function levelOf(d) { return Math.max(1, Math.min(99, Math.round(power(d) / 13))); }
 function presenceOf(d, now) {
   now = now || Date.now();
   var p = store.pres[jobId(d)], al = document.getElementById("autolunch"), c = cfg(), m = nowMin(now);
@@ -148,10 +188,7 @@ function skl(d) {
   return o && typeof o === "object" ? { k: String(o.k || ""), kd: String(o.kd || ""), q: String(o.q || "") } : { k: d.k || "", kd: d.kd || "", q: d.q || "" };
 }
 function nameParts(n) {
-  var a = Array.from(String(n));
-  if (a.length < 7) return [String(n)];
-  var m = Math.ceil(a.length / 2);
-  return [a.slice(0, m).join(""), a.slice(m).join("")];
+  return [String(n)];
 }
 function nameHtml(n) { var p = nameParts(n); return p.length > 1 ? esc(p[0]) + "<br>" + esc(p[1]) : esc(p[0]); }
 function nameLines(d, suffix) { var p = nameParts(d.n); suffix = suffix || ""; return p.length > 1 ? [p[0], p[1] + suffix] : [p[0] + suffix]; }
@@ -219,6 +256,12 @@ function statOf(d) {
 function healthOf(d) {
   var o = store.health[jobId(d)], value = o ? +o.value : 100;
   return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 100;
+}
+function batteryOf(d, now) {
+  var base = healthOf(d), current = nowMin(now), leave = hmMin(cfg().oe), start = 9 * 60;
+  if (current <= start || leave <= start) return base;
+  if (current >= leave) return Math.round(base * 0.35);
+  return Math.max(0, Math.round(base * (1 - ((current - start) / (leave - start)) * 0.65)));
 }
 function power(d) { return statOf(d).reduce(function (a, b) { return a + b; }, 0); }
 function rarity(lv) { return lv >= 50 ? ["전설", "#f4c95d", "r-legend"] : lv >= 38 ? ["영웅", "#e6e9f5", ""] : lv >= 26 ? ["희귀", "#8fa3d6", ""] : ["일반", "#6b7399", ""]; }
@@ -359,7 +402,7 @@ function saveHealth(i, value) {
 function presEditor(d) {
   return '<div class="jobedit" id="prespanel" hidden><div class="mlabel">상태 (점심 60분, 휴식 30분 뒤 돌아와요 · 야근은 오늘 퇴근 시간이 지나도 남아요)</div>' +
     '<div class="recs"><button type="button" class="pr" data-s="work">업무중</button><button type="button" class="pr" data-s="lunch">🍗 점심</button><button type="button" class="pr" data-s="break">☕ 휴식</button><button type="button" class="otbtn" aria-pressed="' + (isOT(d) ? "true" : "false") + '">🌙 야근' + (isOT(d) ? " ✓" : "") + '</button></div>' +
-    '<div class="jrow"><button type="button" class="jcancel">닫기</button></div><div class="jstatus" role="status"></div></div>';
+    '<div class="jrow"><button type="button" class="jcancel panel-close" aria-label="닫기">✕</button></div><div class="jstatus" role="status"></div></div>';
 }
 function saveOT(i) {
   var d = DATA[i], on = !isOT(d);
@@ -399,7 +442,7 @@ function seatEditor(d) {
     h += '<button type="button" class="sw' + (isCur ? " cur" : "") + (o ? "" : " vac") + '" data-s="' + s.idx + '"' + (isCur ? " disabled" : "") + ' title="' + pos + '">' + (isCur ? "지금 자리 · " : "") + (o ? esc(o.n) : "빈 자리 · " + pos) + "</button>";
   });
   return '<div class="jobedit" id="seatpanel" hidden><div class="mlabel">자리 교체 — 사람을 고르면 서로 자리를 바꾸고, 빈 자리를 고르면 그 자리로 옮겨요</div><div class="recs">' + h + "</div>" +
-    '<div class="jrow"><button type="button" class="sreset">원래 자리로</button><button type="button" class="jcancel">닫기</button></div>' +
+    '<div class="jrow"><button type="button" class="sreset">원래 자리로</button><button type="button" class="jcancel panel-close" aria-label="닫기">✕</button></div>' +
     '<div class="jstatus" role="status"></div></div>';
 }
 function saveSeat(i, tIdx) {
@@ -502,7 +545,7 @@ function visible() {
   list.sort(function (a, b) {
     if (state.sort === "name") return a.n.localeCompare(b.n, "ko");
     if (state.sort === "pow") return power(b) - power(a);
-    return b.lv - a.lv;
+    return levelOf(b) - levelOf(a);
   });
   return list;
 }
@@ -555,9 +598,9 @@ function renderGrid() {
   mapSet = {}; list.forEach(function (d) { mapSet[jobId(d)] = 1; }); mapFilt = list.length !== DATA.length;
   var today = todayStr();
   list.forEach(function (d) {
-    var u = UNI[uOf(d)], rr = rarity(d.lv), p = power(d), off = onLeave(d, today), nt = openTasks(d).length;
+    var u = UNI[uOf(d)], level = levelOf(d), rr = rarity(level), p = power(d), off = onLeave(d, today), nt = openTasks(d).length;
     html += '<button type="button" class="card ' + rr[2] + (off ? " off" : "") + '" data-i="' + DATA.indexOf(d) + '" style="--c:' + u.color + ";--rar:" + rr[1] + '">' +
-      '<div class="art' + (off ? " off" : "") + '" style="color:' + u.color + '">' + sprite(d) + '<span class="lv">Lv.' + d.lv + '</span><span class="rar">' + rr[0] + "</span>" + (off ? '<span class="leavetag">' + esc(offLabel(d)) + "</span>" : "") + (nt ? '<span class="tbadge">침입 ' + nt + "</span>" : "") + "</div>" +
+      '<div class="art' + (off ? " off" : "") + '" style="color:' + u.color + '">' + sprite(d) + '<span class="lv">Lv.' + level + '</span><span class="rar">' + rr[0] + "</span>" + (off ? '<span class="leavetag">' + esc(offLabel(d)) + "</span>" : "") + (nt ? '<span class="tbadge">침입 ' + nt + "</span>" : "") + "</div>" +
       '<div class="cname">' + nameHtml(d.n) + '</div><div class="cclass">' + esc(tline(d)) + esc(job(d)) + "</div>" +
       '<div class="pow"><span>전투력</span><span class="bar"><i style="width:' + Math.round(p / 5) + '%"></i></span><span>' + p + "</span></div></button>";
   });
@@ -566,7 +609,7 @@ function renderGrid() {
 }
 
 function openSheet(i, opener) {
-  var d = DATA[i], u = UNI[uOf(d)], rr = rarity(d.lv), off = onLeave(d), sheet = document.getElementById("sheet"), canEdit = canEditCharacter(d);
+  var d = DATA[i], u = UNI[uOf(d)], level = levelOf(d), rr = rarity(level), off = onLeave(d), sheet = document.getElementById("sheet"), canEdit = canEditCharacter(d);
   if (opener) lastFocus = opener;
   var stats = "";
   statOf(d).forEach(function (v, j) { stats += '<div class="stat"><span>' + STAT_LABELS[j] + '</span><span class="bar"><i style="width:' + v + '%"></i></span><b>' + v + "</b></div>"; });
@@ -575,7 +618,7 @@ function openSheet(i, opener) {
   sheet.style.setProperty("--c", u.color);
   sheet.innerHTML =
     '<button type="button" class="close" aria-label="닫기">✕</button>' +
-    '<div><div class="art' + (off ? " off" : "") + '" style="color:' + u.color + '">' + sprite(d) + '<span class="lv">Lv.' + d.lv + '</span><span class="rar" style="--rar:' + rr[1] + '">' + rr[0] + "</span>" + (off ? '<span class="leavetag">' + esc(offLabel(d)) + "</span>" : "") + "</div></div>" +
+    '<div><div class="art' + (off ? " off" : "") + '" style="color:' + u.color + '">' + sprite(d) + '<span class="lv">Lv.' + level + '</span><span class="rar" style="--rar:' + rr[1] + '">' + rr[0] + "</span>" + (off ? '<span class="leavetag">' + esc(offLabel(d)) + "</span>" : "") + "</div></div>" +
     "<div>" +
     '<h2 class="sname" id="sname">' + nameHtml(d.n) + "</h2>" +
     '<div class="smeta"><span>' + esc(tline(d)) + '<b class="jobname">' + esc(job(d)) + "</b> · " + esc(u.realm) + "</span>" +
@@ -712,7 +755,7 @@ var reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-m
 var LAYOUT = [
   [1, 0, ""], [2, 0, ""], [3, 0, ""], [4, 0, ""], [5, 0, ""], [6, 0, ""], [7, 0, ""],
   [0, 1, "@FTP"], [1, 1, "@ER"], [2, 1, ""], [4, 1, ""], [5, 1, ""], [6, 1, ""], [7, 1.5, ""],
-  [0, 2, ""], [1, 2, "불꽃토끼"], [2, 2, ""], [4, 2, ""], [5, 2, ""], [6, 2, ""],
+  [0, 2, ""], [1, 2, ""], [2, 2, ""], [4, 2, ""], [5, 2, ""], [6, 2, ""],
   [0, 3, ""], [1, 3, ""], [2, 3, ""], [4, 3, ""], [5, 3, ""], [6, 3, ""], [7, 3, ""],
   [0, 4, "@공석"], [1, 4, ""], [2, 4, "@공석"], [4, 4, ""], [5, 4, ""], [6, 4, ""], [7, 4, ""],
   [0, 5, ""], [1, 5, ""], [2, 5, "@공석"], [4, 5, ""], [5, 5, ""], [6, 5, "@퍼블"], [7, 5, "@퍼블"]
@@ -1358,8 +1401,9 @@ function label(t, cx, y, gray) {
   mctx.font = "500 11px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"; mctx.textAlign = "center";
   for (k = 0; k < ls.length; k++) {
     var yy = y - (ls.length - 1 - k) * 13;
-    mctx.lineWidth = 3; mctx.strokeStyle = T.ls; mctx.strokeText(ls[k], cx, yy);
-    mctx.fillStyle = gray ? T.lg : T.lf; mctx.fillText(ls[k], cx, yy);
+    var text = fit(mctx, ls[k], 120);
+    mctx.lineWidth = 3; mctx.strokeStyle = T.ls; mctx.strokeText(text, cx, yy);
+    mctx.fillStyle = gray ? T.lg : T.lf; mctx.fillText(text, cx, yy);
   }
   mctx.textAlign = "left";
 }
@@ -1382,7 +1426,7 @@ function otBadge(x, y) {
   mctx.font = "700 10px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"; mctx.textAlign = "left"; mctx.fillStyle = "#e6dcff"; mctx.fillText("야근", x + 4, y + 11);
 }
 function drawHealthBattery(x, y, d) {
-  var value = healthOf(d), px = Math.round(x + CW / 2 - 10), py = Math.round(y - 23);
+  var value = batteryOf(d), px = Math.round(x + CW / 2 - 10), py = Math.round(y - 23);
   mctx.save();
   mctx.globalAlpha = 0.96;
   mctx.fillStyle = "#111629"; mctx.fillRect(px, py, 20, 8);
@@ -1889,8 +1933,8 @@ document.getElementById("snackpane").addEventListener("click", function (e) {
 document.getElementById("sfree").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); snackAdd(e.target.value); } });
 
 /* ---- 공지와 개인·그룹 채팅 ---- */
-var chatMe = "", chatSeen = 0, chatMode = "notice", privateContacts = [], activePrivateRoom = "", activePrivateRecipients = [];
-try { chatMe = localStorage.getItem("ops-me") || ""; chatSeen = +localStorage.getItem("ops-chat-seen") || 0; } catch (e) {}
+var chatMe = "", chatSeen = 0, privateSeen = 0, chatMode = "notice", privateContacts = [], activePrivateRoom = "", activePrivateRecipients = [];
+try { chatMe = localStorage.getItem("ops-me") || ""; chatSeen = +localStorage.getItem("ops-chat-seen") || 0; privateSeen = +localStorage.getItem("ops-private-seen") || 0; } catch (e) {}
 function chatList() {
   return Object.keys(store.chat).map(function (id) {
     var m = store.chat[id];
@@ -1906,6 +1950,18 @@ function fmtT(at) { var d = new Date(at); return (d.getMonth() + 1) + "/" + d.ge
 function updateBadge() {
   var b = document.getElementById("cbadge"), n = chatList().filter(function (m) { return m.at > chatSeen && m.p !== chatMe; }).length;
   b.textContent = n > 99 ? "99+" : n; b.hidden = !n || state.view === "chat";
+  updatePrivateBadge();
+}
+function updatePrivateBadge() {
+  var badge = document.getElementById("private-badge"), count = privateMessageList().filter(function (m) { return m.sender !== currentUser && (+m.at || 0) > privateSeen; }).length;
+  if (!badge) return;
+  badge.textContent = count > 99 ? "99+" : count;
+  badge.hidden = !count || state.view !== "chat" || chatMode === "private";
+}
+function markPrivateSeen() {
+  var messages = privateMessageList(), last = messages.length ? (+messages[messages.length - 1].at || 0) : 0;
+  if (last > privateSeen) { privateSeen = last; try { localStorage.setItem("ops-private-seen", String(privateSeen)); } catch (e) {} }
+  updatePrivateBadge();
 }
 function markSeen() {
   var l = chatList(), last = l.length ? l[l.length - 1].at : 0;
@@ -1946,7 +2002,10 @@ function sendChat() {
   commit("chat", newId("c"), { p: chatMe, t: t, at: Date.now() }, function () { inp.value = ""; renderChat(true); markSeen(); inp.focus(); }, "#cstatus");
 }
 function contactName(username) {
-  if (username === currentUser) return currentUser + " (나)";
+  if (username === currentUser) {
+    var mine = DATA.filter(function (d) { return d.id === currentCharacterId; })[0];
+    return (mine ? mine.n : currentUser) + " (나)";
+  }
   var contact = privateContacts.filter(function (item) { return item.username === username; })[0];
   return contact ? contact.name + " (" + username + ")" : username;
 }
@@ -1976,9 +2035,10 @@ function renderPrivateChat() {
     title.textContent = activePrivateRecipients.map(contactName).join(", ");
   } else title.textContent = "대화 상대를 선택하세요";
   log.innerHTML = active.map(function (message) {
-    return '<div class="cmsg' + (message.sender === currentUser ? " me" : "") + '"><div class="cbody"><b>' + esc(message.sender) + "</b><time>" + fmtT(message.at) + "</time><p>" + esc(message.text) + "</p></div></div>";
+    return '<div class="cmsg' + (message.sender === currentUser ? " me" : "") + '"><div class="cbody"><b>' + esc(contactName(message.sender)) + "</b><time>" + fmtT(message.at) + "</time><p>" + esc(message.text) + "</p></div></div>";
   }).join("") || '<p class="tempty">' + (activePrivateRecipients.length ? "첫 메시지를 보내보세요." : "대화 상대를 선택하세요.") + "</p>";
   log.scrollTop = log.scrollHeight;
+  if (state.view === "chat" && chatMode === "private") markPrivateSeen(); else updatePrivateBadge();
 }
 function openPrivateConversation() {
   var list = document.getElementById("private-recipients"), recipients = [];
@@ -2010,7 +2070,7 @@ document.getElementById("chat-modes").addEventListener("click", function (event)
   document.getElementById("notice-pane").hidden = chatMode !== "notice";
   document.getElementById("private-pane").hidden = chatMode !== "private";
   document.querySelectorAll("#chat-modes .chat-mode").forEach(function (tab) { tab.setAttribute("aria-selected", String(tab === button)); });
-  if (chatMode === "private") renderPrivateChat();
+  if (chatMode === "private") { renderPrivateChat(); markPrivateSeen(); }
   else { renderChat(); markSeen(); }
 });
 document.getElementById("private-open").addEventListener("click", openPrivateConversation);
@@ -2031,6 +2091,33 @@ document.getElementById("clist").addEventListener("click", function (event) {
 
 /* ---- 멤버 화면: 편집 권한이 있는 사람이 입력해서 추가해요 ---- */
 var SIDES = [["front", "프론트"], ["back", "백오피스"]];
+var adminAccountsLoaded = false;
+function renderAdminCharacterAccounts() {
+  var form = document.getElementById("admin-character-form");
+  if (!form || !dbRef || currentRole !== "ADMIN" || adminAccountsLoaded) return;
+  adminAccountsLoaded = true;
+  dbRef.adminAccounts().then(function (accounts) {
+    var select = document.getElementById("admin-character-account");
+    select.innerHTML = (accounts || []).map(function (account) {
+      return '<option value="' + esc(account.username) + '">' + esc(account.username) + " · 캐릭터 " + account.characterCount + "개</option>";
+    }).join("") || '<option value="">계정이 없습니다</option>';
+  }, function () {
+    adminAccountsLoaded = false;
+    document.getElementById("admin-character-status").textContent = "계정 목록을 불러오지 못했습니다.";
+  });
+}
+function createAdminCharacter() {
+  var account = document.getElementById("admin-character-account").value;
+  var nameInput = document.getElementById("admin-character-name");
+  var status = document.getElementById("admin-character-status");
+  var name = nameInput.value.trim();
+  if (!account) { status.textContent = "계정을 선택해 주세요."; return; }
+  if (!name) { status.textContent = "캐릭터 이름을 입력해 주세요."; nameInput.focus(); return; }
+  status.textContent = "";
+  dbRef.createAdminCharacter({ username: account, n: name, g: "m", u: document.getElementById("admin-character-universe").value }).then(function () {
+    nameInput.value = ""; status.textContent = "캐릭터를 계정에 연결했습니다."; adminAccountsLoaded = false; afterPeople();
+  }, function () { status.textContent = "캐릭터를 생성하지 못했습니다."; });
+}
 function subUnis(side) { return Object.keys(UNI).filter(function (k) { var u = UNI[k]; return u.side === side && !u.hidden && k !== "fgen" && k !== "bgen"; }); }
 function fillSub() {
   var sd = document.getElementById("tmside").value, sub = document.getElementById("tmsub"), h = '<option value="">소분류 (선택 안 함)</option>';
@@ -2041,6 +2128,7 @@ function pickedUni() { var sd = document.getElementById("tmside").value, sub = d
 function renderTeam() {
   var can = canEditJobs(), sdEl = document.getElementById("tmside"), ps = sdEl.value, sb = document.getElementById("tmsub").value, h = "";
   refreshForms();
+  renderAdminCharacterAccounts();
   document.getElementById("teamnote").hidden = can;
   if (!sdEl.options.length) sdEl.innerHTML = SIDES.map(function (o) { return '<option value="' + o[0] + '">' + o[1] + "</option>"; }).join("");
   if (ps) sdEl.value = ps;
@@ -2085,6 +2173,7 @@ function removePerson(id) {
 }
 document.getElementById("teampane").addEventListener("click", function (e) {
   var b = e.target.closest(".tmdel");
+  if (e.target.closest("#admin-character-create")) { createAdminCharacter(); return; }
   if (e.target.closest("#tmadd")) { addPerson(); return; }
   if (b) {
     var member = DATA.find(function (d) { return d.id === b.dataset.id; });
@@ -2177,9 +2266,12 @@ function setWorldTheme(theme, save) {
   paintMap();
   renderGrid();
   if (openIdx !== null) openSheet(openIdx, null);
+  if (bgm.playing) { stopBgm(); startBgm(); }
 }
 document.getElementById("themebar").addEventListener("click", function (e) { var b = e.target.closest(".side"); if (b) setTheme(b.dataset.t, true); });
 document.getElementById("world-themebar").addEventListener("click", function (e) { var b = e.target.closest("[data-world-theme]"); if (b) setWorldTheme(b.dataset.worldTheme, true); });
+document.getElementById("bgm-toggle").addEventListener("click", toggleBgm);
+syncBgmButton();
 setTheme(document.documentElement.getAttribute("data-ops-theme"), false);
 setWorldTheme(document.documentElement.getAttribute("data-world-theme"), false);
 
@@ -2200,6 +2292,7 @@ if (window.claude && window.claude.use) {
       snap.docs.forEach(function (doc) { var value = doc.data(); if (value && Array.isArray(value.participants)) m[doc.id] = value; });
       store.privateChats = m;
       if (state.view === "chat" && chatMode === "private") renderPrivateChat();
+      else updatePrivateBadge();
     }, function () {});
     var loaded = { tasks: false, meetings: false, projects: false, chat: false, seats: false, people: false };
     db.collection("people").onSnapshot(function (snap) {

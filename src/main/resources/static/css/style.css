@@ -1,3 +1,5 @@
+.lede, .note { width: min(100%, 1100px); overflow-wrap: normal; text-wrap: wrap; }
+.lede > span, .note > span { display: block; }
 /* 로그인 화면과 멀티버스 보드의 레이아웃, 테마, 반응형 및 상태별 스타일을 정의합니다. */
 :root {
   --bg: #101719;
@@ -149,7 +151,7 @@ h1 em { font-style: normal; color: var(--gold); }
 .art svg { width: 84%; height: 84%; image-rendering: pixelated; filter: drop-shadow(0 6px 10px #0008); }
 .lv { position: absolute; left: 8px; top: 8px; font-family: var(--font-mono); font-weight: 700; font-size: 12px; background: var(--badge); border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px; }
 .rar { position: absolute; right: 8px; top: 8px; font-size: 11px; font-weight: 700; color: var(--rar); background: var(--badge); border: 1px solid var(--rar); border-radius: 5px; padding: 2px 7px; }
-.cname { font-family: var(--font-display); font-size: 22px; line-height: 1.1; padding-inline: 4px; overflow-wrap: anywhere; }
+.cname { font-family: var(--font-display); font-size: 22px; line-height: 1.1; padding-inline: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cclass { font-size: 13px; color: var(--c); padding-inline: 4px; margin-top: -6px; }
 .pow { display: flex; align-items: center; gap: 8px; padding-inline: 4px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .bar { flex: 1; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
@@ -168,7 +170,7 @@ h1 em { font-style: normal; color: var(--gold); }
 }
 .sheet .art { width: 100%; }
 .close { position: absolute; right: 10px; top: 10px; width: 34px; height: 34px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); font-size: 18px; line-height: 1; }
-.sname { font-family: var(--font-display); font-size: 34px; line-height: 1.05; margin: 0; padding-right: 40px; }
+.sname { font-family: var(--font-display); font-size: 34px; line-height: 1.05; margin: 0; padding-right: 40px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .smeta { color: var(--c); font-size: 14px; margin: 4px 0 14px; }
 .stats { display: grid; gap: 8px; margin: 0 0 16px; }
 .stat { display: grid; grid-template-columns: 64px minmax(0, 1fr) 30px; gap: 10px; align-items: center; font-size: 13px; }
@@ -195,8 +197,11 @@ h1 em { font-style: normal; color: var(--gold); }
 .otbtn[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); }
 .eg .mini:hover { background: var(--panel); border-color: var(--line); }
 .jobedit { background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin: 0 0 14px; }
+.jobedit { position: relative; }
 .jobedit[hidden] { display: none; }
 .jobedit .jrow button { align-self: center; min-height: 30px; padding: 3px 8px; border-radius: 6px; font-size: 12px; }
+.jobedit .panel-close { position: absolute; top: 7px; right: 7px; width: 30px; min-width: 30px; height: 30px; min-height: 30px; padding: 0; border-color: transparent; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; }
+.jobedit .panel-close:hover { border-color: var(--line); background: var(--panel); color: var(--text); }
 .recs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .recs button { min-height: 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 12.5px; }
 .recs button:hover { border-color: var(--c); }
@@ -300,6 +305,7 @@ h1 em { font-style: normal; color: var(--gold); }
 .chat-modes { display: flex; gap: 6px; margin: 0 0 14px; border-bottom: 1px solid var(--line); }
 .chat-mode { padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; }
 .chat-mode[aria-selected="true"] { border-bottom-color: var(--gold); color: var(--text); }
+.private-badge { display: inline-grid; min-width: 18px; height: 18px; place-items: center; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 10px; line-height: 1; }
 .private-chat { display: grid; grid-template-columns: minmax(190px, 250px) minmax(0, 1fr); gap: 14px; max-width: 980px; }
 .private-sidebar { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .private-recipient-label { color: var(--muted); font-size: 13px; }
@@ -398,12 +404,16 @@ h1, .side, .cname, .sname, .portal .pname, .skill .sk, .pane h2, .mhead b, .phea
 body { padding-block: 24px 48px; }
 .wrap { max-width: 1280px; }
 h1 { margin: 12px 0 8px; font-size: 54px; line-height: 1.08; letter-spacing: 0; }
-.lede { max-width: 70ch; margin-bottom: 20px; font-size: 15px; }
+.lede { max-width: 1100px; margin-bottom: 20px; font-size: 15px; }
 .hrow { min-height: 42px; }
 .theme-controls { gap: 10px; }
 .theme-controls .sides { gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
 .theme-controls .side { min-height: 32px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 13px; padding: 4px 11px; }
 .theme-controls .side[aria-pressed="true"] { background: var(--panel-2); color: var(--text); box-shadow: inset 0 -2px var(--gold); }
+.bgm-toggle { min-height: 32px; padding: 4px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--muted); font-size: 12px; white-space: nowrap; }
+.bgm-toggle[aria-pressed="true"] { border-color: var(--lead); color: var(--text); background: color-mix(in srgb, var(--lead) 14%, var(--panel)); }
+.note { max-width: 1100px; margin: 36px auto 0; border-top: 1px solid var(--line); padding-top: 16px; color: var(--muted); font-size: 13px; }
+.lede, .note { max-width: 1100px; overflow-wrap: normal; word-break: keep-all; text-wrap: wrap; }
 .accountbar { margin-top: -8px; margin-bottom: 18px; font-size: 13px; }
 .accountbar button { min-height: 34px; padding: 4px 10px; border-radius: 6px; }
 .gnav { top: 6px; padding: 5px; border-radius: 10px; background: color-mix(in srgb, var(--panel) 96%, transparent); border-color: var(--line); box-shadow: 0 4px 16px #0002; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
@@ -464,7 +474,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { border-color
 body { padding-block: 24px 48px; }
 .wrap { max-width: 1280px; }
 h1 { margin: 12px 0 8px; font-size: 56px; line-height: 1.08; letter-spacing: 0; }
-.lede { max-width: 70ch; margin-bottom: 20px; font-size: 15px; }
+.lede { max-width: 1100px; margin-bottom: 20px; font-size: 15px; }
 .hrow { min-height: 42px; }
 .theme-controls { gap: 10px; }
 .theme-controls .sides { gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }

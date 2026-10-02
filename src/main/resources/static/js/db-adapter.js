@@ -101,6 +101,12 @@
 
   var db = {
     collection: function (col) { return query(col, null); },
+    adminAccounts: function () { return req("GET", API + "/admin/accounts"); },
+    createAdminCharacter: function (payload) {
+      return req("POST", API + "/admin/characters", payload).then(function (character) {
+        return pull().then(function () { return character; });
+      });
+    },
     privateChatContacts: function () { return req("GET", API + "/chats/private/contacts"); },
     sendPrivateMessage: function (recipients, text) {
       return req("POST", API + "/chats/private", { recipients: recipients, text: text }).then(function (message) {

@@ -99,6 +99,24 @@ public class DocController {
         return accounts.characters();
     }
 
+    /** 관리자용 계정·캐릭터 매핑 목록을 반환합니다. */
+    @GetMapping("/admin/accounts")
+    public List<Map<String, Object>> adminAccounts() {
+        if (!auth.isAdmin()) throw new AccessDeniedException("관리자만 계정 목록을 볼 수 있습니다.");
+        return accounts.adminAccounts();
+    }
+
+    /** 관리자가 지정한 계정에 캐릭터를 추가합니다. */
+    @PostMapping("/admin/characters")
+    public ResponseEntity<HeroCharacter> createAdminCharacter(@RequestBody Map<String, String> payload) {
+        if (!auth.isAdmin()) throw new AccessDeniedException("관리자만 캐릭터를 매핑할 수 있습니다.");
+        String owner = payload.get("username");
+        if (!accounts.accountExists(owner)) throw new IllegalArgumentException("계정을 찾을 수 없습니다.");
+        HeroCharacter character = accounts.createCharacter(owner, true, payload);
+        events.emitRefresh();
+        return ResponseEntity.status(HttpStatus.CREATED).body(character);
+    }
+
     /** 현재 사용자를 제외한 개인·그룹 채팅 가능 계정과 캐릭터 이름을 반환합니다. */
     @GetMapping("/chats/private/contacts")
     public List<Map<String, Object>> privateChatContacts() {
@@ -122,7 +140,7 @@ public class DocController {
     /** 현재 계정 소유의 캐릭터를 생성합니다. */
     @PostMapping("/characters")
     public ResponseEntity<HeroCharacter> createCharacter(@RequestBody Map<String, String> payload) {
-        HeroCharacter character = accounts.createCharacter(auth.currentUser(), payload);
+        HeroCharacter character = accounts.createCharacter(auth.currentUser(), auth.isAdmin(), payload);
         events.emitRefresh();
         return ResponseEntity.status(HttpStatus.CREATED).body(character);
     }

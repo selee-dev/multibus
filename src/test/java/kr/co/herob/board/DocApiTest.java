@@ -37,6 +37,16 @@ class DocApiTest {
         mvc.perform(get("/api/docs").session(session))
             .andExpect(status().isOk()).andExpect(jsonPath("$.nicks.admin-test.n").value("관리자 수정"));
         mvc.perform(delete("/api/doc/nicks/admin-test").session(session)).andExpect(status().isNoContent());
+        MvcResult firstAdminCharacter = mvc.perform(post("/api/characters").session(session)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"n\":\"Admin One\"}"))
+            .andExpect(status().isCreated()).andReturn();
+        MvcResult secondAdminCharacter = mvc.perform(post("/api/characters").session(session)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"n\":\"Admin Two\"}"))
+            .andExpect(status().isCreated()).andReturn();
+        String firstAdminId = json.readTree(firstAdminCharacter.getResponse().getContentAsString()).get("id").asText();
+        String secondAdminId = json.readTree(secondAdminCharacter.getResponse().getContentAsString()).get("id").asText();
+        mvc.perform(delete("/api/characters/" + firstAdminId).session(session)).andExpect(status().isNoContent());
+        mvc.perform(delete("/api/characters/" + secondAdminId).session(session)).andExpect(status().isNoContent());
     }
 
     @Test
@@ -90,6 +100,20 @@ class DocApiTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"n\":\"Admin Edited\"}"))
             .andExpect(status().isOk()).andExpect(jsonPath("$.n").value("Admin Edited"));
         mvc.perform(delete("/api/characters/" + characterId).session(adminSession)).andExpect(status().isNoContent());
+        mvc.perform(get("/api/docs").session(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.people.main.list[*].id").value(
+                org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(characterId))));
+        mvc.perform(put("/api/doc/people/main").session(adminSession)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"list\":[{\"id\":\"char-not-created\",\"n\":\"삭제된 계정\"},{\"id\":\"p-manual\",\"n\":\"수동 멤버\"}]}"))
+            .andExpect(status().isNoContent());
+        mvc.perform(get("/api/docs").session(adminSession))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.people.main.list[*].id").value(
+                org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("char-not-created"))))
+            .andExpect(jsonPath("$.people.main.list[*].id").value(
+                org.hamcrest.Matchers.hasItem("p-manual")));
         mvc.perform(get("/api/events").session(adminSession).accept(MediaType.TEXT_EVENT_STREAM))
             .andExpect(status().isOk());
     }
@@ -124,9 +148,14 @@ class DocApiTest {
         MockHttpSession senderSession = register(sender);
         MockHttpSession recipientSession = register(recipient);
         MockHttpSession outsiderSession = register(outsider);
+        mvc.perform(post("/api/characters").session(recipientSession)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"n\":\"Recipient Hero\"}"))
+            .andExpect(status().isCreated());
         mvc.perform(get("/api/chats/private/contacts").session(senderSession))
             .andExpect(status().isOk()).andExpect(jsonPath("$[*].username")
-                .value(org.hamcrest.Matchers.hasItems(recipient, outsider)));
+                .value(org.hamcrest.Matchers.hasItem(recipient)))
+            .andExpect(jsonPath("$[*].username")
+                .value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(outsider))));
 
         mvc.perform(put("/api/doc/chat/notice-test").session(senderSession)
                 .contentType(MediaType.APPLICATION_JSON).content("{\"p\":\"sender\",\"t\":\"notice\"}"))

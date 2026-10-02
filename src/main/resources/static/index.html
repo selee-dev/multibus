@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>멀티버스 닉네임판</title>
-<link rel="stylesheet" href="css/style.css?v=20261001-6">
+<link rel="stylesheet" href="css/style.css?v=20261002-3">
 <script>
 /* 첫 화면이 깜빡이지 않도록 색상 모드와 전장 테마를 먼저 적용 */
 (function () {
@@ -35,7 +35,7 @@
     </form>
     <form id="register-form" class="auth-form" hidden>
       <label>아이디<input id="register-username" name="username" type="text" minlength="3" maxlength="30" pattern="[A-Za-z0-9_\-]{3,30}" autocomplete="username" required><small id="register-username-status" class="field-status" aria-live="polite"></small></label>
-      <label>비밀번호<input id="register-password" name="new-password" type="password" minlength="4" maxlength="72" autocomplete="new-password" required></label>
+      <label>비밀번호<input id="register-password" name="new-password" type="password" autocomplete="new-password" required></label>
       <button class="auth-submit" type="submit">계정 만들기</button>
     </form>
     <form id="character-form" class="auth-form" hidden>
@@ -53,9 +53,9 @@
 
 <div class="wrap" hidden>
   <header>
-    <div class="hrow"><div class="eyebrow">Multiverse</div><div class="theme-controls"><div class="sides themebar" id="themebar" role="group" aria-label="화면 모드"><button type="button" class="side" data-t="dark" aria-pressed="true">다크</button><button type="button" class="side" data-t="light" aria-pressed="false">라이트</button></div><div class="sides worldthemebar" id="world-themebar" role="group" aria-label="전장 테마"><button type="button" class="side" data-world-theme="battlefield" aria-pressed="true">전장</button><button type="button" class="side" data-world-theme="space" aria-pressed="false">우주</button></div></div></div>
+    <div class="hrow"><div class="eyebrow">Multiverse</div><div class="theme-controls"><div class="sides themebar" id="themebar" role="group" aria-label="화면 모드"><button type="button" class="side" data-t="dark" aria-pressed="true">다크</button><button type="button" class="side" data-t="light" aria-pressed="false">라이트</button></div><div class="sides worldthemebar" id="world-themebar" role="group" aria-label="전장 테마"><button type="button" class="side" data-world-theme="battlefield" aria-pressed="true">전장</button><button type="button" class="side" data-world-theme="space" aria-pressed="false">우주</button></div><button type="button" id="bgm-toggle" class="bgm-toggle" aria-pressed="true">BGM 켜짐</button></div></div>
     <h1><em>멀티버스</em></h1>
-    <p class="lede">프론트와 백오피스, 두 개의 차원에서 <span id="total"></span>명의 영웅이 서비스를 지킵니다. 차원과 유니버스를 고르거나 이름과 스킬로 검색해서 동료를 만나보세요.</p>
+    <p class="lede"><span>프론트와 백오피스, 두 개의 차원에서 <span id="total"></span>명의 영웅이 서비스를 지킵니다.</span><span>차원과 유니버스를 고르거나 이름과 스킬로 검색해서 동료를 만나보세요.</span></p>
     <div class="accountbar"><span id="account-name"></span><button type="button" id="logout-button" aria-label="로그아웃">로그아웃</button></div>
   </header>
 
@@ -138,7 +138,7 @@
     <h2>공지와 메시지</h2>
     <div class="chat-modes" id="chat-modes" role="tablist" aria-label="채팅 종류">
       <button type="button" class="chat-mode" data-chat-mode="notice" role="tab" aria-selected="true">공지</button>
-      <button type="button" class="chat-mode" data-chat-mode="private" role="tab" aria-selected="false">개인·그룹 채팅</button>
+      <button type="button" class="chat-mode" data-chat-mode="private" role="tab" aria-selected="false">개인·그룹 채팅 <b id="private-badge" class="private-badge" hidden></b></button>
     </div>
     <section id="notice-pane" class="chatbox" aria-label="공지">
       <p>공지 내용은 모든 사용자에게 표시됩니다. 팀장·상무급 캐릭터와 관리자만 작성할 수 있습니다.</p>
@@ -168,6 +168,11 @@
     <h2>영웅 모집</h2>
     <p>처음에는 불꽃토끼만 있어요. 편집 권한이 있는 사람이 닉네임과 소속(대분류 > 소분류)을 입력해서 멤버를 추가하면 지도와 명단에 나타나요. 소분류, 직급, 직업은 비워 둬도 되고, 나중에 캐릭터 시트에서 바꿀 수 있어요.</p>
     <p class="tempty" id="teamnote" hidden>이 페이지의 편집 권한이 있는 사람만 멤버를 추가하거나 뺄 수 있어요.</p>
+    <div class="pform admin-character-form" id="admin-character-form" hidden>
+      <div class="mlabel">관리자 · 계정에 캐릭터 매핑</div>
+      <div class="jrow"><select id="admin-character-account" aria-label="캐릭터를 연결할 계정"></select><input id="admin-character-name" type="text" maxlength="30" placeholder="캐릭터 이름" aria-label="캐릭터 이름"><select id="admin-character-universe" aria-label="캐릭터 유니버스"><option value="member">프론트 회원</option><option value="order">프론트 주문</option><option value="display">프론트 전시</option><option value="broadcast">프론트 알림</option><option value="curation">프론트 큐레이션</option><option value="fgen">프론트</option><option value="bord">백오피스 주문</option><option value="bprod">백오피스 상품</option><option value="blog">백오피스 물류</option><option value="bsettle">백오피스 정산</option><option value="bgen">백오피스</option></select><button type="button" id="admin-character-create" class="jsave">캐릭터 생성</button></div>
+      <div class="jstatus" id="admin-character-status" role="status"></div>
+    </div>
     <div class="pform" id="teamform">
       <div class="jrow"><input id="tmname" type="text" maxlength="30" placeholder="닉네임 (필수)" aria-label="닉네임" autocomplete="off"><input id="tmtitle" type="text" maxlength="8" placeholder="직급 (선택)" aria-label="직급" autocomplete="off"><input id="tmjob" type="text" maxlength="16" placeholder="직업 (선택)" aria-label="직업" autocomplete="off"></div>
       <div class="jrow" style="margin-top:8px"><select id="tmside" aria-label="소속 대분류"></select><select id="tmsub" aria-label="소속 소분류 (선택)"></select><select id="tmg" aria-label="캐릭터 성별"><option value="m">남</option><option value="f">여</option></select><button type="button" id="tmadd" class="jsave">멤버 추가</button></div>
@@ -179,7 +184,7 @@
 
   <main class="grid" id="grid" hidden></main>
 
-  <p class="note">닉네임과 직급은 멤버를 추가할 때 입력하고, 스탯과 레벨은 화면 구성을 위한 임시 설정이며 스탯은 시트의 「스탯」에서 각자 조정할 수 있습니다. 직업과 직급은 캐릭터 시트의 「직업 바꾸기」「직급」에서 바꿀 수 있고, 맡은 업무·근태·전출·자리도 시트에서 관리합니다. 회의, 프로젝트 팀, 간식 담당팀, 채팅, 멤버 추가는 위쪽 탭에서 사용합니다.</p>
+  <p class="note"><span>닉네임과 직급은 멤버를 추가할 때 입력하고, 스탯과 레벨은 화면 구성을 위한 임시 설정이며 스탯은 시트의 「스탯」에서 각자 조정할 수 있습니다.</span><span>직업과 직급은 캐릭터 시트의 「직업 바꾸기」「직급」에서 바꿀 수 있고, 맡은 업무·근태·전출·자리도 시트에서 관리합니다.</span><span>회의, 프로젝트 팀, 간식 담당팀, 채팅, 멤버 추가는 위쪽 탭에서 사용합니다.</span></p>
 </div>
 
 <div class="veil" id="veil" hidden>
@@ -188,6 +193,6 @@
 
 <script src="js/auth.js"></script>
 <script src="js/db-adapter.js"></script>
-<script src="js/app.js?v=20261001-6"></script>
+<script src="js/app.js?v=20261002-1"></script>
 
 </body></html>

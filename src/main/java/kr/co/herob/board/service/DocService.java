@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 import kr.co.herob.board.mapper.DocMapper;
@@ -48,11 +49,22 @@ public class DocService {
         }
         ObjectNode main = ((ObjectNode) root.get("people")).with("main");
         ArrayNode members = main.withArray("list");
+        List<HeroCharacter> activeCharacters = accounts.characters();
+        Set<String> activeCharacterIds = activeCharacters.stream()
+            .map(HeroCharacter::id).collect(java.util.stream.Collectors.toSet());
+        for (int i = members.size() - 1; i >= 0; i--) {
+            JsonNode member = members.get(i);
+            String memberId = member.path("id").asText();
+            boolean accountCharacter = member.path("accountCharacter").asBoolean(false)
+                || memberId.startsWith("char");
+            if (accountCharacter
+                && !activeCharacterIds.contains(member.path("id").asText())) members.remove(i);
+        }
         Set<String> knownIds = new java.util.HashSet<>();
         members.forEach(member -> {
             if (member.hasNonNull("id")) knownIds.add(member.get("id").asText());
         });
-        for (HeroCharacter character : accounts.characters()) {
+        for (HeroCharacter character : activeCharacters) {
             if (!knownIds.contains(character.id())) {
                 ObjectNode member = json.createObjectNode();
                 member.put("id", character.id());

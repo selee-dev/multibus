@@ -58,6 +58,11 @@ public class AccountService implements UserDetailsService {
 
     /** 저장소에 관리자 계정이 없을 때 개발용 데모 계정을 추가합니다. */
     public void ensureDemoAdmin() {
+        try {
+            jdbc.execute("ALTER TABLE HERO_CHARACTER DROP CONSTRAINT IF EXISTS HERO_CHARACTER_OWNER_ID_KEY");
+        } catch (org.springframework.dao.DataAccessException ignored) {
+            // 새 스키마에는 이미 중복 소유자를 허용하므로 마이그레이션 실패를 시작 장애로 만들지 않습니다.
+        }
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM HERO_ACCOUNT WHERE USERNAME = 'admin'", Integer.class);
         if (count == null || count == 0) {
             jdbc.update("INSERT INTO HERO_ACCOUNT (USERNAME, PASSWORD_HASH, ROLE_NAME) VALUES (?, ?, ?)",
@@ -71,8 +76,8 @@ public class AccountService implements UserDetailsService {
         if (!USERNAME.matcher(username).matches() || "admin".equals(username)) {
             throw new IllegalArgumentException("아이디는 영문 소문자, 숫자, _, - 조합 3~30자로 입력해 주세요.");
         }
-        if (password == null || password.length() < 4 || password.length() > 72) {
-            throw new IllegalArgumentException("비밀번호는 4~72자로 입력해 주세요.");
+        if (password == null || password.isBlank()) {
+            throw new IllegalArgumentException("비밀번호를 입력해 주세요.");
         }
         try {
             jdbc.update("INSERT INTO HERO_ACCOUNT (USERNAME, PASSWORD_HASH, ROLE_NAME) VALUES (?, ?, ?)",
@@ -122,7 +127,7 @@ public class AccountService implements UserDetailsService {
     /** 개인·그룹 채팅 연락처로 다른 모든 계정을 캐릭터 정보와 함께 조회합니다. */
     public List<Map<String, Object>> privateChatContacts(String currentUsername) {
         return jdbc.query("SELECT A.USERNAME, C.NICKNAME, C.CHARACTER_ID FROM HERO_ACCOUNT A "
-                + "LEFT JOIN HERO_CHARACTER C ON C.OWNER_ID = A.USERNAME WHERE A.USERNAME <> ? ORDER BY A.USERNAME",
+            + "JOIN HERO_CHARACTER C ON C.OWNER_ID = A.USERNAME WHERE A.USERNAME <> ? ORDER BY A.USERNAME",
             (rs, rowNum) -> {
                 String username = rs.getString("USERNAME");
                 Map<String, Object> contact = new java.util.LinkedHashMap<>();
@@ -139,16 +144,28 @@ public class AccountService implements UserDetailsService {
             + "FROM HERO_CHARACTER ORDER BY CREATED_AT, OWNER_ID", CHARACTER_ROW);
     }
 
-    /** 계정당 한 개의 캐릭터를 검증 후 생성합니다. */
-    public HeroCharacter createCharacter(String username, Map<String, String> input) {
+    /** 관리자 매핑 화면에 표시할 모든 계정과 캐릭터 수를 조회합니다. */
+    public List<Map<String, Object>> adminAccounts() {
+        return jdbc.query("SELECT A.USERNAME, COUNT(C.CHARACTER_ID) AS CHARACTER_COUNT "
+                + "FROM HERO_ACCOUNT A LEFT JOIN HERO_CHARACTER C ON C.OWNER_ID = A.USERNAME "
+                + "GROUP BY A.USERNAME ORDER BY A.USERNAME",
+            (rs, rowNum) -> Map.of("username", rs.getString("USERNAME"),
+                "characterCount", rs.getInt("CHARACTER_COUNT")));
+    }
+
+    /** 일반 계정은 하나, 관리자는 여러 개의 캐릭터를 검증 후 생성합니다. */
+    public HeroCharacter createCharacter(String username, boolean allowMultiple, Map<String, String> input) {
         CharacterFields fields = validateFields(input, null);
         String id = "char" + UUID.randomUUID().toString().replace("-", "");
+        if (!allowMultiple && characterIdFor(username) != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "계정당 캐릭터는 하나만 생성할 수 있습니다.");
+        }
         try {
             jdbc.update("INSERT INTO HERO_CHARACTER "
                 + "(CHARACTER_ID, OWNER_ID, NICKNAME, GENDER, TITLE, UNIVERSE, JOB) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 id, username, fields.name(), fields.gender(), fields.title(), fields.universe(), fields.job());
         } catch (DuplicateKeyException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "계정당 캐릭터는 하나만 생성할 수 있습니다.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "캐릭터를 생성할 수 없습니다.");
         }
         return new HeroCharacter(id, username, fields.name(), fields.gender(), fields.title(),
             fields.universe(), fields.job(), true);
