@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>멀티버스 닉네임판</title>
-<link rel="stylesheet" href="css/style.css?v=20261002-6">
+<link rel="stylesheet" href="css/style.css?v=20261002-10">
 <script>
 /* 첫 화면이 깜빡이지 않도록 색상 모드와 전장 테마를 먼저 적용 */
 (function () {
@@ -91,7 +91,7 @@
     <div class="wcontrols">
       <label><input type="checkbox" id="names" checked> 이름 표시</label>
       <label><input type="checkbox" id="autolunch" checked> 점심시간 자동</label>
-      <label id="boss-visit-control" hidden><input type="checkbox" id="boss-visit"> 사장님 방문</label>
+      <label id="boss-visit-control"><input type="checkbox" id="boss-visit"> 사장님 등장</label>
       <span class="cfgline">점심 <input type="time" id="cfgls" value="12:00" aria-label="점심 시작"> ~ <input type="time" id="cfgle" value="13:00" aria-label="점심 끝"> · 퇴근 <input type="time" id="cfgoe" value="18:00" aria-label="퇴근 시간"> <span class="jstatus" id="cfgst" role="status"></span></span>
       <span id="otcount" class="otcount"></span>
       <div class="legend" id="legend" aria-label="팀별 책상 색"></div>
@@ -201,6 +201,6 @@
 
 <script src="js/auth.js?v=20261002-2"></script>
 <script src="js/db-adapter.js"></script>
-<script src="js/app.js?v=20261002-4"></script>
+<script src="js/app.js?v=20261002-14"></script>
 
 </body></html>

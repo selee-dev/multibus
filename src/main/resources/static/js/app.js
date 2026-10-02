@@ -148,9 +148,10 @@ function isOT(d) { var o = store.ot[jobId(d)]; return !!(o && o.d === todayStr()
 function isGone(d, now) { return nowMin(now) >= hmMin(cfg().oe) && !isOT(d); }
 function shouldSitAtDesk(d, now) {
   now = now || Date.now();
+  if (WORLD_THEME !== "office") return false;
   if (WORLD_THEME === "office" && bossVisitOn()) return !onLeave(d) && !isGone(d, now) && !presenceOf(d, now) && !inActiveMeeting(d);
-  var p = store.pres[jobId(d)], minute = nowMin(now), end = hmMin(cfg().oe);
-  var working = d.ext ? !presenceOf(d, now) : p && p.s === "work" && typeof p.at === "number" && now - p.at < 3600000;
+  var minute = nowMin(now), end = hmMin(cfg().oe);
+  var working = !presenceOf(d, now);
   return !!(working && minute >= 540 && (minute < end || isOT(d)));
 }
 function levelOf(d) { return Math.max(1, Math.min(99, Math.round(power(d) / 13))); }
@@ -161,13 +162,17 @@ function presenceOf(d, now) {
     if (p.s === "work" && now - p.at < 3600000) return "";
     if (p.s === "lunch" && now - p.at < 3600000) return "lunch";
     if (p.s === "break" && now - p.at < 1800000) return "break";
+    if (p.s === "away") return "away";
   }
   return al && al.checked && m >= hmMin(c.ls) && m < hmMin(c.le) ? "lunch" : "";
+}
+function selectedPresence(d, now) {
+  return presenceOf(d, now) || "work";
 }
 function presTag(d) {
   if (isGone(d)) return " · 퇴근";
   var p = presenceOf(d), t = isOT(d) ? " · 야근" : "";
-  return t + (p === "lunch" ? " · 점심 중" : p === "break" ? " · 휴식 중" : "");
+  return t + (p === "lunch" ? " · 점심 중" : p === "break" ? " · 휴식 중" : p === "away" ? " · 자리비움" : "");
 }
 function attText(d) {
   if (d.off) return d.off;
@@ -408,8 +413,9 @@ function saveHealth(i, value) {
   commit("health", jobId(d), value === null || number === 100 ? null : { value: number }, function () { renderGrid(); openSheet(i, null); }, "#healthpanel .jstatus");
 }
 function presEditor(d) {
-  return '<div class="jobedit" id="prespanel" hidden><div class="mlabel">상태 (점심 60분, 휴식 30분 뒤 돌아와요 · 야근은 오늘 퇴근 시간이 지나도 남아요)</div>' +
-    '<div class="recs"><button type="button" class="pr" data-s="work">업무중</button><button type="button" class="pr" data-s="lunch">🍗 점심</button><button type="button" class="pr" data-s="break">☕ 휴식</button><button type="button" class="otbtn" aria-pressed="' + (isOT(d) ? "true" : "false") + '">🌙 야근' + (isOT(d) ? " ✓" : "") + '</button></div>' +
+  var active = selectedPresence(d);
+  return '<div class="jobedit" id="prespanel" hidden><div class="mlabel">상태 (업무중은 기본 상태 · 점심 60분, 휴식 30분 뒤 복귀)</div>' +
+    '<div class="recs"><button type="button" class="pr" data-s="work" aria-pressed="' + (active === "work") + '">업무중</button><button type="button" class="pr" data-s="lunch" aria-pressed="' + (active === "lunch") + '">🍗 점심</button><button type="button" class="pr" data-s="break" aria-pressed="' + (active === "break") + '">☕ 휴식</button><button type="button" class="pr" data-s="away" aria-pressed="' + (active === "away") + '">자리비움</button><button type="button" class="otbtn" aria-pressed="' + (isOT(d) ? "true" : "false") + '">🌙 야근' + (isOT(d) ? " ✓" : "") + '</button></div>' +
     '<div class="jrow"><button type="button" class="jcancel panel-close" aria-label="닫기">✕</button></div><div class="jstatus" role="status"></div></div>';
 }
 function saveOT(i) {
@@ -417,6 +423,7 @@ function saveOT(i) {
   commit("ot", jobId(d), on ? { d: todayStr(), at: Date.now() } : null, function () { syncMeetings(false); renderGrid(); openSheet(i, null); }, "#prespanel .jstatus");
 }
 function savePres(i, st) {
+  if (["work", "lunch", "break", "away"].indexOf(st) < 0) return;
   commit("pres", jobId(DATA[i]), { s: st, at: Date.now() }, function () { syncMeetings(false); openSheet(i, null); }, "#prespanel .jstatus");
 }
 function attEditor(d) {
@@ -1280,6 +1287,41 @@ function snackHit(ev) {
 function areaOf(u) { var g = REGIONS[u]; return { x0: g.x + 10, x1: g.x + g.w - 10 - CW, y0: g.y + 62, y1: g.y + g.h - 10 - CH }; }
 function iAreaOf(u) { var g = REGIONS[u]; return { x0: g.x + 10, x1: g.x + g.w - 10 - IW, y0: g.y + 62, y1: g.y + g.h - 10 - IH }; }
 var OFFICE = { x0: 90, x1: 860, y0: 90, y1: 590 };
+var bossWalker = null;
+function bossWalkArea() {
+  if (WORLD_THEME === "office") return { x0: 80, x1: 820, y0: 78, y1: 560 };
+  if (WORLD_THEME === "space") return { x0: 80, x1: 840, y0: 90, y1: 570 };
+  return { x0: 70, x1: 850, y0: 82, y1: 570 };
+}
+function ensureBossWalker() {
+  if (!bossVisitOn()) { bossWalker = null; return null; }
+  if (!bossWalker || bossWalker.theme !== WORLD_THEME) {
+    var area = bossWalkArea(), x = area.x0 + Math.random() * (area.x1 - area.x0 - 100), y = area.y0 + Math.random() * (area.y1 - area.y0 - 168);
+    bossWalker = { theme: WORLD_THEME, x: x, y: y, tx: x, ty: y, wait: 0.4, speed: 28, anim: 0, moving: false, dir: 1 };
+  }
+  return bossWalker;
+}
+function updateBossWalker(dt) {
+  var b = ensureBossWalker(), area, dx, dy, dist, step;
+  if (!b) return;
+  area = bossWalkArea();
+  if (b.wait > 0) {
+    b.wait -= dt;
+    b.moving = false;
+    if (b.wait <= 0) {
+      b.tx = area.x0 + Math.random() * (area.x1 - area.x0 - 100);
+      b.ty = area.y0 + Math.random() * (area.y1 - area.y0 - 168);
+    }
+    return;
+  }
+  dx = b.tx - b.x; dy = b.ty - b.y; dist = Math.hypot(dx, dy); step = b.speed * dt;
+  if (dist <= step) {
+    b.x = b.tx; b.y = b.ty; b.wait = 0.8 + Math.random() * 2.4; b.moving = false;
+    return;
+  }
+  b.dir = dx < 0 ? -1 : 1;
+  b.x += dx / dist * step; b.y += dy / dist * step; b.moving = true; b.anim += dt;
+}
 function wanderOf(u) { return WORLD_THEME === "office" ? OFFICE : REGIONS[u] ? areaOf(u) : OFFICE; }
 function randIn(a) { return [a.x0 + Math.random() * (a.x1 - a.x0), a.y0 + Math.random() * (a.y1 - a.y0)]; }
 function deskFor(d) { return SEATNOW[jobId(d)] || null; }
@@ -1426,6 +1468,7 @@ function syncMeetings(initial) {
 
 function update(dt) {
   if (reduceMotion) return;
+  updateBossWalker(dt);
   walkers.forEach(function (w) {
     if (w.mode === "leave" || w.mode === "gone") { w.moving = false; return; }
     if (w.route.length) {
@@ -1439,7 +1482,7 @@ function update(dt) {
     if (w.mode === "meet" || w.seat) { w.moving = false; return; }
     if (w.mode === "away") {
       w.moving = false;
-      if (w.tag === "lunch") return;
+      if (w.tag === "lunch" || w.tag === "away") return;
       if (w.wait > 0) { w.wait -= dt; if (w.wait <= 0) goTo(w, awayDest()); }
       else goTo(w, awayDest());
       return;
@@ -1491,6 +1534,25 @@ function label(t, cx, y, gray) {
   }
   mctx.textAlign = "left";
 }
+function presenceBadge(text, cx, top) {
+  mctx.save();
+  mctx.font = "700 10px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif";
+  var width = mctx.measureText(text).width + 12, height = 16, left = cx - width / 2, radius = 5;
+  mctx.beginPath();
+  mctx.moveTo(left + radius, top);
+  mctx.arcTo(left + width, top, left + width, top + height, radius);
+  mctx.arcTo(left + width, top + height, left, top + height, radius);
+  mctx.arcTo(left, top + height, left, top, radius);
+  mctx.arcTo(left, top, left + width, top, radius);
+  mctx.closePath();
+  mctx.fillStyle = "#a85b08";
+  mctx.fill();
+  mctx.fillStyle = "#fff";
+  mctx.textAlign = "center";
+  mctx.textBaseline = "middle";
+  mctx.fillText(text, cx, top + height / 2);
+  mctx.restore();
+}
 function arrow(ax, ay) {
   mctx.fillStyle = T.arrow;
   mctx.fillRect(ax - 3, ay, 7, 1); mctx.fillRect(ax - 2, ay + 1, 5, 1); mctx.fillRect(ax - 1, ay + 2, 3, 1); mctx.fillRect(ax, ay + 3, 1, 1);
@@ -1509,8 +1571,8 @@ function otBadge(x, y) {
   mctx.strokeStyle = "#b79cff"; mctx.lineWidth = 1; mctx.strokeRect(x + 0.5, y + 0.5, 27, 13);
   mctx.font = "700 10px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"; mctx.textAlign = "left"; mctx.fillStyle = "#e6dcff"; mctx.fillText("야근", x + 4, y + 11);
 }
-function drawHealthBattery(x, y, d) {
-  var value = batteryOf(d), px = Math.round(x + CW / 2 - 10), py = Math.round(y - 23);
+function drawHealthBattery(x, y, d, characterHeight) {
+  var value = batteryOf(d), px = Math.round(x + CW / 2 - 10), py = Math.round(y + (characterHeight || CH) + 1);
   mctx.save();
   mctx.globalAlpha = 0.96;
   mctx.fillStyle = "#111629"; mctx.fillRect(px, py, 20, 8);
@@ -1578,6 +1640,55 @@ function drawDesk(s, tint, lit) {
   mctx.fillStyle = tint; mctx.fillRect(x, y, 84, 2); mctx.fillRect(x, y + 28, 84, 2);
   mctx.fillStyle = "#7c86b3"; mctx.fillRect(s.cx - 10, s.ry + 44, 20, 3);
 }
+function drawBossVisitor() {
+  var boss = ensureBossWalker(), step = boss && boss.moving ? Math.sin(boss.anim * 9) * 4 : 0, bob = boss && boss.moving ? Math.abs(Math.sin(boss.anim * 9)) * 2 : 0;
+  if (!boss) return;
+  mctx.save();
+  mctx.translate(Math.round(boss.x), Math.round(boss.y - bob));
+  mctx.globalAlpha = 1;
+  mctx.fillStyle = "#0008";
+  mctx.beginPath(); mctx.ellipse(50, 158, 38, 7, 0, 0, Math.PI * 2); mctx.fill();
+  if (WORLD_THEME === "office") {
+    var jacket = mctx.createLinearGradient(22, 48, 78, 126);
+    jacket.addColorStop(0, "#344858"); jacket.addColorStop(0.52, "#202e3b"); jacket.addColorStop(1, "#17232f");
+    mctx.fillStyle = "#20232a"; mctx.fillRect(31, 116 + step, 15, 31); mctx.fillRect(54, 116 - step, 15, 31);
+    mctx.fillStyle = "#11151a"; mctx.fillRect(26, 144 + step, 23, 8); mctx.fillRect(51, 144 - step, 24, 8);
+    mctx.fillStyle = jacket; mctx.beginPath(); mctx.moveTo(26, 57); mctx.quadraticCurveTo(31, 47, 42, 45); mctx.lineTo(58, 45); mctx.quadraticCurveTo(71, 47, 76, 58); mctx.lineTo(71, 119); mctx.quadraticCurveTo(50, 125, 29, 119); mctx.closePath(); mctx.fill();
+    mctx.fillStyle = "#edf0ee"; mctx.beginPath(); mctx.moveTo(42, 46); mctx.lineTo(58, 46); mctx.lineTo(62, 82); mctx.lineTo(50, 96); mctx.lineTo(38, 82); mctx.closePath(); mctx.fill();
+    mctx.fillStyle = "#9d4655"; mctx.beginPath(); mctx.moveTo(47, 49); mctx.lineTo(53, 49); mctx.lineTo(59, 87); mctx.lineTo(50, 100); mctx.lineTo(41, 87); mctx.closePath(); mctx.fill();
+    mctx.fillStyle = "#d4b18f"; mctx.fillRect(41, 30, 19, 19); mctx.beginPath(); mctx.ellipse(50, 30, 16, 19, 0, 0, Math.PI * 2); mctx.fill();
+    mctx.fillStyle = jacket; mctx.beginPath(); mctx.moveTo(35, 28); mctx.quadraticCurveTo(32, 7, 51, 7); mctx.quadraticCurveTo(69, 7, 66, 29); mctx.lineTo(59, 22); mctx.lineTo(40, 22); mctx.closePath(); mctx.fill();
+    mctx.fillStyle = "#15202a"; mctx.fillRect(38, 27, 10, 6); mctx.fillRect(52, 27, 10, 6);
+    mctx.strokeStyle = "#b8d0d5"; mctx.lineWidth = 2; mctx.strokeRect(38, 26, 11, 7); mctx.strokeRect(51, 26, 11, 7); mctx.beginPath(); mctx.moveTo(49, 29); mctx.lineTo(51, 29); mctx.stroke();
+    mctx.fillStyle = "#775342"; mctx.fillRect(39, 37, 22, 4); mctx.fillStyle = "#8b5f4e"; mctx.fillRect(45, 39, 12, 3);
+    mctx.fillStyle = "#d4b18f"; mctx.fillRect(17, 60 - step, 12, 43); mctx.fillRect(72, 60 + step, 12, 43);
+    mctx.fillStyle = jacket; mctx.fillRect(17, 54 - step, 12, 34); mctx.fillRect(72, 54 + step, 12, 34);
+    mctx.fillStyle = "#d4b18f"; mctx.fillRect(17, 101 - step, 12, 9); mctx.fillRect(72, 101 + step, 12, 9);
+    mctx.fillStyle = "#d8bd83"; mctx.fillRect(62, 69, 6, 3); mctx.fillRect(32, 69, 5, 3);
+    mctx.fillStyle = "#20232a"; mctx.fillRect(35, 119, 4, 18); mctx.fillRect(57, 119, 4, 18);
+  } else if (WORLD_THEME === "space") {
+    mctx.fillStyle = "#6c4ec2"; mctx.fillRect(28, 63, 44, 74); mctx.fillRect(34, 132 + step, 13, 17); mctx.fillRect(54, 132 - step, 13, 17);
+    mctx.fillStyle = "#56d6a3"; mctx.fillRect(20, 72, 12, 45); mctx.fillRect(68, 72, 12, 45); mctx.fillRect(38, 24, 25, 26);
+    mctx.fillStyle = "#91f0c1"; mctx.beginPath(); mctx.ellipse(50, 29, 23, 24, 0, 0, Math.PI * 2); mctx.fill();
+    mctx.fillStyle = "#182331"; mctx.beginPath(); mctx.ellipse(41, 29, 6, 9, 0, 0, Math.PI * 2); mctx.ellipse(59, 29, 6, 9, 0, 0, Math.PI * 2); mctx.fill();
+    mctx.fillStyle = "#d5fff0"; mctx.fillRect(39, 26, 3, 4); mctx.fillRect(57, 26, 3, 4);
+    mctx.strokeStyle = "#91f0c1"; mctx.lineWidth = 4; mctx.beginPath(); mctx.moveTo(40, 9); mctx.lineTo(30, -3); mctx.moveTo(60, 9); mctx.lineTo(70, -3); mctx.stroke();
+    mctx.fillStyle = "#e5a7ff"; mctx.fillRect(44, 45, 12, 10); mctx.fillRect(42, 151, 17, 4);
+  } else {
+    mctx.fillStyle = "#33251e"; mctx.fillRect(27, 116 + step, 18, 32); mctx.fillRect(54, 116 - step, 18, 32);
+    mctx.fillStyle = "#d8b48b"; mctx.fillRect(22, 144 + step, 26, 9); mctx.fillRect(51, 144 - step, 27, 9);
+    mctx.fillStyle = "#7e392d"; mctx.fillRect(20, 60, 60, 62); mctx.fillStyle = "#c18a59"; mctx.fillRect(30, 52, 43, 16);
+    mctx.fillStyle = "#c18a59"; mctx.fillRect(37, 23, 28, 29); mctx.fillStyle = "#b87a4e"; mctx.fillRect(32, 33, 6, 14);
+    mctx.fillStyle = "#4a3020"; mctx.fillRect(28, 14, 11, 22); mctx.fillRect(63, 14, 11, 22); mctx.fillRect(36, 12, 30, 10);
+    mctx.fillStyle = "#211b19"; mctx.fillRect(40, 32, 7, 5); mctx.fillRect(55, 32, 7, 5);
+    mctx.fillStyle = "#d8b48b"; mctx.fillRect(16, 65, 12, 47); mctx.fillRect(72, 65, 12, 47);
+    mctx.fillStyle = "#53463c"; mctx.fillRect(42, 69, 17, 9); mctx.fillStyle = "#c8aa68"; mctx.fillRect(47, 70, 7, 5);
+    mctx.fillStyle = "#8d7656"; mctx.fillRect(8, 44, 5, 73); mctx.fillRect(5, 40, 12, 8);
+  }
+  mctx.fillStyle = "#17151b"; mctx.fillRect(17, 169, 66, 14);
+  mctx.fillStyle = "#ffffff"; mctx.font = "bold 9px sans-serif"; mctx.textAlign = "center"; mctx.fillText("사장님", 50, 179);
+  mctx.restore();
+}
 function draw() {
   mctx.globalAlpha = 1; mctx.drawImage(bg, 0, 0);
   if (WORLD_THEME === "space") drawSpaceBodies();
@@ -1618,7 +1729,7 @@ function draw() {
   var showNames = document.getElementById("names").checked, today = todayStr(), owner = {};
   walkers.forEach(function (w) { if (w.hd) owner[w.hd.idx] = w; });
   SEATS.forEach(function (s) {
-    if (!owner[s.idx] && WORLD_THEME !== "office") return;
+    if (WORLD_THEME !== "office") return;
     var w = owner[s.idx], d = w ? DATA[w.i] : null, sit = w ? isSitting(w) : false, on = d ? mapOn(d) : true, off = d ? onLeave(d, today) : false;
     var tint = d ? ucol(uOf(d)) : "#5b638f", nm = d ? jobId(d) : "";
     mctx.globalAlpha = on ? 1 : 0.28;
@@ -1639,11 +1750,10 @@ function draw() {
       mctx.fillStyle = "#fff"; mctx.fillText(t, s.cx - 36, s.ry + 61);
     }
     if (sit && on && d && isOT(d)) otBadge(s.cx + 18, s.ry + 2);
-    if (!d) label(s.kind === "person" ? "빈 자리" : s.n, s.cx, s.ry + 9, true);
-    else if (WORLD_THEME === "office" && !sit) label(fit(mctx, d.n, 76), s.cx, s.ry + 9, true);
-    else if (sit && on && (showNames || hover === w)) label(nameLines(d, off ? " · " + offLabel(d) : ""), s.cx, s.y - 5, off);
-    if (sit && on && d) drawHealthBattery(s.x, s.y, d);
-    if (sit && on && hover === w) arrow(s.cx, s.y - 27);
+    if (!d && s.kind !== "person") label(s.n, s.cx, s.ry + 9, true);
+    else if (d && on && (showNames || hover === w)) label(nameLines(d, off ? " · " + offLabel(d) : ""), s.cx, s.y - 4, off);
+    if (sit && on && d) drawHealthBattery(s.x, s.y, d, 32);
+    if (sit && on && hover === w) arrow(s.cx, s.y - 20);
   });
   walkers.slice().sort(function (a, b) { return a.y - b.y; }).forEach(function (w) {
     if (isSitting(w)) return;
@@ -1658,9 +1768,16 @@ function draw() {
       if (WORLD_THEME === "office") mctx.drawImage(foodIcon("밥"), x + 6, y - 22);
       else if (!w.route.length) { if (WORLD_THEME === "space") spaceMeal(x + CW - 5, y + 12); else drumstick(x + CW - 5, y + 12 + (Math.sin(lastT / 170 + w.i * 1.7) > 0.3 ? -3 : 0)); }
       else { if (WORLD_THEME === "space") spaceMeal(x + 8, y - 26); else drumstick(x + 8, y - 26); }
-    } else if (w.mode === "away" && w.tag) mctx.drawImage(foodIcon("커피"), x + 4, y - 32);
-    if (on && (showNames || hover === w || w.mode === "away")) label(nameLines(d, off ? " · " + offLabel(d) : (w.mode === "away" ? (w.tag === "lunch" ? (WORLD_THEME === "space" ? " · 우주식량" : " · 점심") : " · 휴식") : (gn ? " · 퇴근" : ""))), x + CW / 2, y - 5, off || gn);
-    if (on && hover === w) arrow(x + CW / 2, y - 27 - (nameParts(d.n).length > 1 ? 13 : 0));
+    } else if (w.mode === "away" && w.tag === "break") mctx.drawImage(foodIcon("커피"), x + 4, y - 32);
+    var name = nameLines(d, off ? " · " + offLabel(d) : (gn ? " · 퇴근" : ""));
+    var presenceText = w.mode === "away" ? (w.tag === "lunch" ? (WORLD_THEME === "space" ? "우주식량" : "점심") : w.tag === "break" ? "휴식" : "자리비움") : "";
+    var showWalkerName = showNames || hover === w || w.mode === "away";
+    if (WORLD_THEME === "office" && w.hd && w.mode === "away") showWalkerName = hover === w;
+    if (on && showWalkerName) label(name, x + CW / 2, y - 4, off || gn);
+    if (on && w.mode === "away") {
+      presenceBadge(presenceText, x + CW / 2, y - (name.length * 13 + 20));
+    }
+    if (on && hover === w) arrow(x + CW / 2, y - (presenceText ? name.length * 13 + 25 : 20));
     if (on && isOT(d) && !off) otBadge(x + CW - 2, y - 2);
   });
   var cnt = {};
@@ -1673,6 +1790,7 @@ function draw() {
     mctx.drawImage(INVS[(Math.floor(lastT / 320) + o.k) % 2], x, y);
     if (hoverInv === o) { mctx.globalAlpha = 1; arrow(x + IW / 2, y - 6); }
   });
+  drawBossVisitor();
   mctx.globalAlpha = 1;
 }
 
@@ -1734,7 +1852,7 @@ mapEl.addEventListener("mousemove", function (ev) {
       : (WORLD_THEME === "space" ? "<b>우주항</b> · 눌러서 프로젝트 팀을 만들어요" : WORLD_THEME === "office" ? "<b>프로젝트 구역</b> · 눌러서 팀을 만들어요" : "<b>용병 진영</b> · 눌러서 프로젝트 팀을 만들어요");
   } else if (h) {
     var d = DATA[h.i], sk = snackNow()[uOf(d)];
-    tip.innerHTML = "<b>" + nameHtml(d.n) + "</b>" + (ttl(d) ? " · " + esc(ttl(d)) : "") + "<br>" + esc(job(d)) + (onLeave(d) ? "<br>" + esc(offLabel(d)) : "") + (h.seat && !h.route.length ? "<br>회의 중" : "") + (h.mode === "away" ? "<br>" + (h.tag === "lunch" ? (WORLD_THEME === "space" ? "우주식량 중" : "점심 중") : "휴식 중") : "") + (openTasks(d).length ? "<br>맡은 업무 " + openTasks(d).length + "건" : "") + (sk ? "<br>간식 당번 · " + esc(sk.items.join(", ")) : "");
+    tip.innerHTML = "<b>" + nameHtml(d.n) + "</b>" + (ttl(d) ? " · " + esc(ttl(d)) : "") + "<br>" + esc(job(d)) + (onLeave(d) ? "<br>" + esc(offLabel(d)) : "") + (h.seat && !h.route.length ? "<br>회의 중" : "") + (h.mode === "away" ? "<br>" + (h.tag === "lunch" ? (WORLD_THEME === "space" ? "우주식량 중" : "점심 중") : h.tag === "break" ? "휴식 중" : "자리비움") : "") + (openTasks(d).length ? "<br>맡은 업무 " + openTasks(d).length + "건" : "") + (sk ? "<br>간식 당번 · " + esc(sk.items.join(", ")) : "");
   } else if (hi) {
     var pi = indexOfId(hi.pid);
     tip.innerHTML = "<b>침입자</b> · " + esc(hi.text) + "<br>담당 " + (pi >= 0 ? esc(DATA[pi].n) : "") + " · 누르면 업무 목록이 열려요";
@@ -2347,7 +2465,14 @@ document.getElementById("autolunch").addEventListener("change", function () { sy
 function fillCfg() { var c = cfg(); document.getElementById("cfgls").value = c.ls; document.getElementById("cfgle").value = c.le; document.getElementById("cfgoe").value = c.oe; document.getElementById("boss-visit").checked = c.bossVisit; syncBossVisitUI(); }
 function saveBossVisit(enabled) {
   var next = cfg(); next.bossVisit = !!enabled;
-  commit("cfg", "main", next, function () { fillCfg(); applySeats(false); syncMeetings(false); }, "#cfgst");
+  if (dbRef && dbRef.setBossVisit) {
+    dbRef.setBossVisit(enabled).then(function () {
+      store.cfg.main = next;
+      fillCfg(); applySeats(false); syncMeetings(false); paintMap();
+    }, function () { fillCfg(); denied("#cfgst"); });
+  } else {
+    commit("cfg", "main", next, function () { fillCfg(); applySeats(false); syncMeetings(false); paintMap(); }, "#cfgst");
+  }
 }
 function updateOT() {
   var n = DATA.filter(function (d) { return isOT(d) && !onLeave(d); }).length, el = document.getElementById("otcount");
@@ -2377,9 +2502,9 @@ function setTheme(t, save) {
 }
 function syncBossVisitUI() {
   var active = bossVisitOn(), control = document.getElementById("boss-visit-control"), checkbox = document.getElementById("boss-visit"), siren = document.getElementById("boss-siren");
-  if (control) control.hidden = WORLD_THEME !== "office";
+  if (control) control.hidden = false;
   if (checkbox) checkbox.checked = active;
-  if (siren) siren.hidden = WORLD_THEME !== "office" || !active;
+  if (siren) siren.hidden = !active;
 }
 function syncOfficeCopy() {
   var office = WORLD_THEME === "office", total = document.getElementById("total"), lead = total && total.nextSibling;
@@ -2507,7 +2632,15 @@ if (window.claude && window.claude.use) {
     }, function () {});
     db.collection("cfg").onSnapshot(function (snap) {
       var m = {};
-      snap.docs.forEach(function (x) { var v = x.data(); if (v && typeof v.ls === "string") m[x.id] = { ls: v.ls, le: v.le, oe: v.oe, bossVisit: v.bossVisit === true }; });
+      snap.docs.forEach(function (x) {
+        var v = x.data();
+        if (v && typeof v === "object") m[x.id] = {
+          ls: typeof v.ls === "string" ? v.ls : "12:00",
+          le: typeof v.le === "string" ? v.le : "13:00",
+          oe: typeof v.oe === "string" ? v.oe : "18:00",
+          bossVisit: v.bossVisit === true
+        };
+      });
       store.cfg = m; fillCfg(); applySeats(false); syncMeetings(false);
     }, function () {});
     db.collection("ot").onSnapshot(function (snap) {
@@ -2517,10 +2650,16 @@ if (window.claude && window.claude.use) {
     }, function () {});
     db.collection("pres").onSnapshot(function (snap) {
       var m = {};
-      snap.docs.forEach(function (x) { var v = x.data(); if (v && ["work", "lunch", "break"].indexOf(v.s) >= 0 && typeof v.at === "number") m[x.id] = { s: v.s, at: v.at }; });
+      snap.docs.forEach(function (x) { var v = x.data(); if (v && ["work", "lunch", "break", "away"].indexOf(v.s) >= 0 && typeof v.at === "number") m[x.id] = { s: v.s, at: v.at }; });
       store.pres = m; syncMeetings(false);
       var al = document.querySelector("#sheet .attline");
-      if (al && openIdx !== null) al.textContent = "근태 · " + attText(DATA[openIdx]);
+      if (al && openIdx !== null) {
+        al.textContent = "근태 · " + attText(DATA[openIdx]);
+        var active = selectedPresence(DATA[openIdx]);
+        document.querySelectorAll("#prespanel .pr").forEach(function (button) {
+          button.setAttribute("aria-pressed", button.getAttribute("data-s") === active ? "true" : "false");
+        });
+      }
     }, function () {});
     db.collection("stats").onSnapshot(function (snap) {
       var m = {};

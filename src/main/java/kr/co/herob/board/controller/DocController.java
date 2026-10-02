@@ -190,6 +190,16 @@ public class DocController {
         return ResponseEntity.noContent().build();
     }
 
+    /** 인증된 사용자가 사장님 방문 토글만 변경하고 모든 구독자에게 알립니다. */
+    @PostMapping("/boss-visit")
+    public ResponseEntity<Void> setBossVisit(@RequestBody Map<String, Boolean> payload) {
+        Boolean enabled = payload.get("enabled");
+        if (enabled == null) return ResponseEntity.badRequest().build();
+        docs.setBossVisit(enabled);
+        events.emitRefresh();
+        return ResponseEntity.noContent().build();
+    }
+
     /** 권한을 확인한 뒤 문서를 삭제하고 구독자에게 변경을 알립니다. */
     @DeleteMapping("/doc/{col}/{id}")
     public ResponseEntity<Void> delete(@PathVariable String col, @PathVariable String id) {

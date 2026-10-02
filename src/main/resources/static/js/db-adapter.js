@@ -108,6 +108,11 @@
       });
     },
     privateChatContacts: function () { return req("GET", API + "/chats/private/contacts"); },
+    setBossVisit: function (enabled) {
+      return req("POST", API + "/boss-visit", { enabled: !!enabled }).then(function () {
+        return pull();
+      });
+    },
     sendPrivateMessage: function (recipients, text) {
       return req("POST", API + "/chats/private", { recipients: recipients, text: text }).then(function (message) {
         return pull().then(function () { return message; });

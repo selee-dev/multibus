@@ -104,8 +104,9 @@ h1 em { font-style: normal; color: var(--gold); }
 .cfgline .jstatus { margin: 0; }
 .otcount { color: var(--ot); font-weight: 700; }
 .wcontrols label { display: inline-flex; align-items: center; gap: 6px; color: var(--text); }
-.boss-siren { position: absolute; left: 73.5%; top: 2%; z-index: 4; display: inline-block; font-size: 48px; line-height: 1; pointer-events: none; filter: drop-shadow(0 0 5px #ef4545); animation: boss-siren-flash .65s steps(2, end) infinite; }
-@keyframes boss-siren-flash { 50% { filter: drop-shadow(0 0 13px #ff2f2f); transform: scale(1.14); } }
+.boss-siren { position: absolute; left: 40%; top: 1.5%; z-index: 4; display: inline-block; font-size: 56px; line-height: 1; pointer-events: none; filter: drop-shadow(0 0 7px #ef4545); transform: scaleY(-1); animation: boss-siren-flash .65s steps(2, end) infinite; }
+.boss-siren[hidden] { display: none; }
+@keyframes boss-siren-flash { 50% { filter: drop-shadow(0 0 13px #ff2f2f); transform: scale(1.14, -1.14); } }
 @media (prefers-reduced-motion: reduce) { .boss-siren { animation: none; } }
 .screen-switch { position: fixed; right: 18px; bottom: 18px; z-index: 45; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--text); box-shadow: 0 6px 20px #0005; font-size: 13px; font-weight: 700; text-decoration: none; }
 .screen-switch svg { width: 18px; height: 18px; flex: 0 0 auto; }
@@ -212,6 +213,7 @@ h1 em { font-style: normal; color: var(--gold); }
 .recs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .recs button { min-height: 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 12.5px; }
 .recs button:hover { border-color: var(--c); }
+.pr[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--panel)); }
 .jrow { display: flex; flex-wrap: wrap; gap: 8px; }
 .jrow input { flex: 1 1 140px; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font: inherit; }
 .jrow button { min-height: var(--control-height); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; }

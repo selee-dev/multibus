@@ -90,6 +90,24 @@ public class DocService {
         if (mapper.update(col, id, text) == 0) mapper.insert(col, id, text);
     }
 
+    /** 공용 설정의 사장님 방문 상태만 갱신하고 나머지 설정은 보존합니다. */
+    @Transactional
+    public void setBossVisit(boolean enabled) {
+        ObjectNode config = json.createObjectNode();
+        for (DocRow row : mapper.selectByCollection("cfg")) {
+            if (!"main".equals(row.id())) continue;
+            try {
+                JsonNode existing = json.readTree(row.body());
+                if (existing != null && existing.isObject()) config = (ObjectNode) existing;
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("공용 설정 문서를 읽을 수 없습니다.", e);
+            }
+            break;
+        }
+        config.put("bossVisit", enabled);
+        save("cfg", "main", config);
+    }
+
     @Transactional
     public void remove(String col, String id) {
         check(col, id);

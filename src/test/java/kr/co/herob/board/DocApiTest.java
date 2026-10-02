@@ -50,6 +50,21 @@ class DocApiTest {
     }
 
     @Test
+    void 일반_사용자도_사장님_등장상태를_모두에게_공유한다() throws Exception {
+        MockHttpSession session = register(uniqueUser("boss-toggle"));
+        mvc.perform(post("/api/boss-visit").session(session)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+            .andExpect(status().isNoContent());
+        mvc.perform(get("/api/docs").session(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.cfg.main.bossVisit").value(true));
+        mvc.perform(post("/api/boss-visit").session(session)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false}"))
+            .andExpect(status().isNoContent());
+        mvc.perform(get("/api/docs").session(session))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.cfg.main.bossVisit").value(false));
+    }
+
+    @Test
     void 가입_세션_캐릭터_소유권과_관리자_권한을_검사한다() throws Exception {
         String owner = uniqueUser("owner");
         MockHttpSession ownerSession = register(owner);
