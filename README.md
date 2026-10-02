@@ -26,7 +26,22 @@ mvn test            # API, 로그인/권한, 실시간 구독 테스트
 2. `render.yaml`의 서비스가 생성되면 무료 플랜으로 배포합니다.
 3. 배포가 끝나면 Render가 제공하는 `onrender.com` 주소로 접속합니다.
 
-무료 플랜은 사용하지 않을 때 절전 상태가 되어 첫 접속이 느릴 수 있습니다. 현재 기본 DB는 컨테이너 내부의 H2 파일 DB이므로 재배포·인스턴스 재생성 시 계정과 데이터가 초기화될 수 있습니다. 실제 운영 데이터가 필요하면 H2 대신 외부 PostgreSQL 또는 Oracle을 연결해야 합니다.
+무료 플랜은 사용하지 않을 때 절전 상태가 되어 첫 접속이 느릴 수 있습니다. 배포 시에는 컨테이너 내부 H2를 사용하지 말고 Supabase·Neon 등 외부 PostgreSQL을 연결하세요. 외부 PostgreSQL을 사용하면 Render 재배포와 무관하게 계정·캐릭터·문서가 유지됩니다.
+
+### PostgreSQL 연결
+
+배포 서비스의 Environment Variables에 다음 값을 설정합니다.
+
+```
+SPRING_DATASOURCE_URL=jdbc:postgresql://호스트:5432/데이터베이스명?sslmode=require
+SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+SPRING_DATASOURCE_USERNAME=사용자명
+SPRING_DATASOURCE_PASSWORD=비밀번호
+SPRING_H2_CONSOLE_ENABLED=false
+SPRING_SQL_INIT_MODE=always
+```
+
+Supabase 또는 Neon에서 PostgreSQL 데이터베이스를 만든 뒤 제공되는 호스트·포트·데이터베이스명·사용자명·비밀번호로 위 값을 채우세요. 비밀번호는 GitHub나 코드에 저장하지 말고 Render 환경변수에만 입력합니다. 서버가 처음 시작할 때 `schema.sql`이 `HERO_DOC`, `HERO_ACCOUNT`, `HERO_CHARACTER` 테이블을 생성합니다.
 
 ## 폴더
 
@@ -75,6 +90,7 @@ src/test/.../DocApiTest.java        API 테스트
 
 - `/api/me`, 회원가입, 로그인, 로그아웃 외 API는 로그인 세션이 필요합니다.
 - 컬렉션 이름은 `DocService.COLLECTIONS` 목록만 허용 (그 외 400). id 는 영문/숫자/`_`/`-` 1~60자입니다. 본문은 JSON 객체여야 하며 직렬화 후 100,000자 이하여야 합니다.
+- 비밀번호는 빈 값만 거부하며 길이 제한은 두지 않습니다.
 - `ADMIN`은 모든 문서 컬렉션을 수정할 수 있습니다. 로그인한 일반 계정도 회의(`meetings`), 간식 당번(`snacks`), 프로젝트 팀(`projects`) 문서는 만들고 수정·삭제할 수 있습니다. 본인 캐릭터가 소유자인 경우 `nicks`, `titles`, `skills`, `stats`, `health`, `tasks`, `pres`, `ot`, `seats`, `status`, `jobs`, `moves` 컬렉션의 해당 캐릭터 문서도 수정할 수 있습니다. 공지(`chat`)는 관리자 또는 본인 캐릭터 직급이 `팀장`·`상무`인 사용자만 작성할 수 있으며, 나머지는 관리자만 수정할 수 있습니다.
 - 개인·그룹 채팅은 별도 API를 사용하며 참여 계정에게만 메시지를 반환합니다. 전체 문서 조회 API에는 개인·그룹 메시지가 포함되지 않습니다.
 - `/api/me`의 `canWrite`는 관리자 여부를 나타냅니다. 일반 계정의 본인 캐릭터 문서 쓰기 권한과는 별개입니다.
@@ -86,7 +102,8 @@ src/test/.../DocApiTest.java        API 테스트
 화면에는 로그인·회원가입·캐릭터 등록 폼이 있으며, `static/js/auth.js`가 세션 API와 연결합니다.
 `app.js` 는 `window.claude.use("db")` 인터페이스를 사용하고, `static/js/db-adapter.js`가 이를 Spring API에 연결합니다.
 서버 연결에 실패하면 어댑터는 `null`을 반환하고 `app.js`는 브라우저 `localStorage` 모드로 동작합니다. 이 모드는 서버와 데이터를 공유하지 않습니다.
-채팅 화면은 팀장·상무급 또는 관리자가 작성하는 공지와 참여자만 볼 수 있는 개인·그룹 대화로 나뉩니다. 채팅 메시지는 캐릭터 머리 위에 표시하지 않고, 지도에는 캐릭터별 체력을 배터리 UI로 표시하며 본인 캐릭터 시트에서 0~100으로 조정할 수 있습니다.
+채팅 화면은 팀장·상무급 또는 관리자가 작성하는 공지와 참여자만 볼 수 있는 개인·그룹 대화로 나뉩니다. 개인·그룹 채팅의 새 메시지는 채팅 탭에 읽지 않은 개수로 표시됩니다. 채팅 메시지는 캐릭터 머리 위에 표시하지 않고, 지도에는 캐릭터별 체력을 배터리 UI로 표시하며 본인 캐릭터 시트에서 0~100으로 조정할 수 있습니다. 배터리는 설정된 퇴근 시간에 가까워질수록 감소합니다.
+캐릭터 레벨은 저장된 5개 스탯의 합계를 기준으로 자동 계산됩니다.
 
 ## 로그인과 편집 권한
 
