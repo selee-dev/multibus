@@ -44,8 +44,9 @@
     registerForm.hidden = stage !== "register";
     characterForm.hidden = stage !== "character";
     document.getElementById("auth-switch").hidden = stage === "character";
-    document.getElementById("auth-eyebrow").textContent = stage === "character" ? "CREATE YOUR HERO" : "MULTIVERSE ACCESS";
-    document.getElementById("auth-title").textContent = stage === "character" ? "영웅을 등록하세요" : "멀티버스로 돌아오세요";
+    var office = document.documentElement.getAttribute("data-world-theme") === "office";
+    document.getElementById("auth-eyebrow").textContent = stage === "character" ? (office ? "CREATE EMPLOYEE" : "CREATE YOUR HERO") : "MULTIVERSE ACCESS";
+    document.getElementById("auth-title").textContent = stage === "character" ? (office ? "직원을 등록하세요" : "영웅을 등록하세요") : "멀티버스로 돌아오세요";
     document.getElementById("auth-copy").textContent = stage === "character"
       ? "계정마다 캐릭터 하나를 만들 수 있어요. 캐릭터 시트는 본인과 관리자만 수정할 수 있습니다."
       : "아이디로 접속하고, 당신의 캐릭터로 멀티버스에 합류하세요.";

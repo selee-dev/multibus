@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>멀티버스 닉네임판</title>
-<link rel="stylesheet" href="css/style.css?v=20261002-3">
+<link rel="stylesheet" href="css/style.css?v=20261002-5">
 <script>
 /* 첫 화면이 깜빡이지 않도록 색상 모드와 전장 테마를 먼저 적용 */
 (function () {
@@ -13,7 +13,7 @@
   try { t = localStorage.getItem("ops-theme") || ""; } catch (e) {}
   try { world = localStorage.getItem("ops-world-theme") || ""; } catch (e) {}
   document.documentElement.setAttribute("data-ops-theme", t === "light" ? "light" : "dark");
-  document.documentElement.setAttribute("data-world-theme", world === "space" ? "space" : "battlefield");
+  document.documentElement.setAttribute("data-world-theme", world === "space" || world === "battlefield" ? world : "office");
 })();
 </script>
 </head>
@@ -53,14 +53,14 @@
 
 <div class="wrap" hidden>
   <header>
-    <div class="hrow"><div class="eyebrow">Multiverse</div><div class="theme-controls"><div class="sides themebar" id="themebar" role="group" aria-label="화면 모드"><button type="button" class="side" data-t="dark" aria-pressed="true">다크</button><button type="button" class="side" data-t="light" aria-pressed="false">라이트</button></div><div class="sides worldthemebar" id="world-themebar" role="group" aria-label="전장 테마"><button type="button" class="side" data-world-theme="battlefield" aria-pressed="true">전장</button><button type="button" class="side" data-world-theme="space" aria-pressed="false">우주</button></div><button type="button" id="bgm-toggle" class="bgm-toggle" aria-pressed="true">BGM 켜짐</button></div></div>
+    <div class="hrow"><div class="eyebrow">Multiverse</div><div class="theme-controls"><div class="sides themebar" id="themebar" role="group" aria-label="화면 모드"><button type="button" class="side" data-t="dark" aria-pressed="true">다크</button><button type="button" class="side" data-t="light" aria-pressed="false">라이트</button></div><div class="sides worldthemebar" id="world-themebar" role="group" aria-label="맵 테마"><button type="button" class="side" data-world-theme="office" aria-pressed="true">사무실</button><button type="button" class="side" data-world-theme="battlefield" aria-pressed="false">전장</button><button type="button" class="side" data-world-theme="space" aria-pressed="false">우주</button></div><button type="button" id="bgm-toggle" class="bgm-toggle" aria-pressed="true">BGM 켜짐</button></div></div>
     <h1><em>멀티버스</em></h1>
     <p class="lede"><span>프론트와 백오피스, 두 개의 차원에서 <span id="total"></span>명의 영웅이 서비스를 지킵니다.</span><span>차원과 유니버스를 고르거나 이름과 스킬로 검색해서 동료를 만나보세요.</span></p>
     <div class="accountbar"><span id="account-name"></span><button type="button" id="logout-button" aria-label="로그아웃">로그아웃</button></div>
   </header>
 
   <nav class="gnav" id="views" aria-label="메뉴">
-    <div class="ngrp"><button type="button" class="nb" data-v="map" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 12 3.5 6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span>전장</span></button></div>
+    <div class="ngrp"><button type="button" class="nb" data-v="map" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 12 3.5 6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg><span>사무실</span></button></div>
     <div class="ngrp"><span class="nlab">영웅</span><button type="button" class="nb" data-v="list" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.3 2.8-5 5.5-5s4.9 1.7 5.5 5"/><circle cx="17" cy="9" r="2.4"/><path d="M16 14.2c2.4.1 4 1.5 4.5 4.3"/></svg><span>영웅 명부</span></button><button type="button" class="nb" data-v="team" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="8" r="3.4"/><path d="M4 19.5c.6-3.6 3-5.5 6-5.5s5.4 1.9 6 5.5"/><path d="M18.5 5v6M15.5 8h6"/></svg><span>영웅 모집</span></button></div>
     <div class="ngrp"><span class="nlab">군영</span><button type="button" class="nb" data-v="meet" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg><span>작전 회의</span></button><button type="button" class="nb" data-v="proj" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>용병단</span></button><button type="button" class="nb" data-v="snack" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5v2.5M11.5 3.5v2.5"/></svg><span>보급</span></button><button type="button" class="nb" data-v="chat" aria-pressed="false"><svg class="ni" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5a2.5 2.5 0 0 1 2.5-2.5h11A2.5 2.5 0 0 1 20 6.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 3.5V17h0A2.5 2.5 0 0 1 4 14.5z"/></svg><span>전령</span><b id="cbadge" class="cbadge" hidden></b></button></div>
   </nav>
@@ -80,26 +80,28 @@
     <span class="count" id="count" aria-live="polite"></span>
   </div>
 
-  <section class="world" id="world" aria-label="전장">
+  <section class="world" id="world" aria-label="사무실 지도">
     <div class="worldscroll">
       <div class="worldbox" id="worldbox">
-        <canvas id="map" width="1200" height="970" role="img" aria-label="멀티버스 전장. 영웅 캐릭터가 전장을 돌아다니고, 오른쪽에는 작전 막사, 아래쪽에는 용병 진영이 있습니다. 같은 정보는 영웅 명부에서도 볼 수 있습니다."></canvas>
+        <canvas id="map" width="1200" height="970" role="img" aria-label="49개 자리로 구성된 사무실. 47개 직원 좌석과 두 번째 줄의 ftp, ER 전용 PC가 있습니다."></canvas>
+        <span id="boss-siren" class="boss-siren" hidden aria-label="사장님 방문 중">🚨</span>
         <div class="tip" id="tip" hidden></div>
       </div>
     </div>
     <div class="wcontrols">
       <label><input type="checkbox" id="names" checked> 이름 표시</label>
       <label><input type="checkbox" id="autolunch" checked> 점심시간 자동</label>
+      <label id="boss-visit-control" hidden><input type="checkbox" id="boss-visit"> 사장님 방문</label>
       <span class="cfgline">점심 <input type="time" id="cfgls" value="12:00" aria-label="점심 시작"> ~ <input type="time" id="cfgle" value="13:00" aria-label="점심 끝"> · 퇴근 <input type="time" id="cfgoe" value="18:00" aria-label="퇴근 시간"> <span class="jstatus" id="cfgst" role="status"></span></span>
       <span id="otcount" class="otcount"></span>
       <div class="legend" id="legend" aria-label="팀별 책상 색"></div>
-      <span>캐릭터를 누르면 캐릭터 시트가 열려요. 빨간 침입자는 팀원이 맡은 미완료 업무이고, 담당자 뒤를 졸졸 따라다니다가 시트에서 완료로 체크하면 사라져요. 점심·휴식·회의 중에는 자리를 비우고, 연차인 캐릭터는 회색으로 멈춰 있어요. 퇴근 시간이 지나면 캐릭터가 흐리게 멈춰 서고, 시트의 「상태」에서 야근을 선택하면 계속 움직여요.</span>
+      <span id="map-guide">캐릭터 시트의 「자리」에서 빈 좌석을 선택할 수 있어요. 다른 캐릭터가 고른 좌석은 선택할 수 없고, 오전 9시부터 퇴근 설정 시간까지 「업무중」 상태인 캐릭터는 자기 책상에 앉아요. 점심·휴식·회의·연차 중에는 자리를 비웁니다.</span>
     </div>
   </section>
 
   <section class="pane" id="meetpane" aria-label="작전 회의" hidden>
     <h2>작전 회의</h2>
-    <p>회의 이름을 적고 함께하는 사람을 고르면, 지도 아래쪽 회의실 테이블에 둘러앉은 모습이 보여요. 회의를 끝내면 다시 자기 자리로 돌아가요. 연차인 사람은 앉지 않고, 한 테이블에 8명까지, 동시에 3개 회의까지 앉을 수 있어요.</p>
+    <p id="meeting-guide">회의 이름과 참석자를 정하면 지도 아래쪽 회의실 테이블에 표시돼요. 회의가 끝나면 각자 자리로 돌아가고, 연차인 사람은 참석할 수 없어요. 테이블은 3개이며 각 회의에 최대 8명까지 참석할 수 있어요.</p>
     <div class="pform">
       <div class="jrow"><input id="mname" type="text" maxlength="30" placeholder="회의 이름 (예: 주간 이슈 점검)" aria-label="회의 이름"><button type="button" id="msave" class="jsave">회의 만들고 시작</button><button type="button" id="mcancelbtn" hidden>수정 취소</button></div>
       <div class="mlabel" style="margin-top:12px">참석자 <span id="mpc"></span></div>
@@ -187,14 +189,18 @@
   <main class="grid" id="grid" hidden></main>
 
   <p class="note"><span>닉네임과 직급은 멤버를 추가할 때 입력하고, 스탯과 레벨은 화면 구성을 위한 임시 설정이며 스탯은 시트의 「스탯」에서 각자 조정할 수 있습니다.</span><span>직업과 직급은 캐릭터 시트의 「직업 바꾸기」「직급」에서 바꿀 수 있고, 맡은 업무·근태·전출·자리도 시트에서 관리합니다.</span><span>회의, 프로젝트 팀, 간식 담당팀, 채팅, 멤버 추가는 위쪽 탭에서 사용합니다.</span></p>
+  <a class="screen-switch" href="https://m.hnsmall.com/" target="_blank" rel="noopener noreferrer" aria-label="홈앤쇼핑 모바일 사이트 새 창으로 열기">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5"/></svg>
+    <span>홈앤쇼핑 열기</span>
+  </a>
 </div>
 
 <div class="veil" id="veil" hidden>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sname"></div>
 </div>
 
-<script src="js/auth.js"></script>
+<script src="js/auth.js?v=20261002-2"></script>
 <script src="js/db-adapter.js"></script>
-<script src="js/app.js?v=20261002-1"></script>
+<script src="js/app.js?v=20261002-3"></script>
 
 </body></html>

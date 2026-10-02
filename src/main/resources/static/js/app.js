@@ -1,5 +1,5 @@
 /* 캐릭터 보드의 화면 상태, 데이터 렌더링, 편집 및 상호작용을 관리합니다. */
-var WORLD_THEME = document.documentElement.getAttribute("data-world-theme") === "space" ? "space" : "battlefield";
+var WORLD_THEME = document.documentElement.getAttribute("data-world-theme") === "space" || document.documentElement.getAttribute("data-world-theme") === "battlefield" ? document.documentElement.getAttribute("data-world-theme") : "office";
 var bgm = { context: null, gain: null, timer: null, step: 0, playing: false, enabled: true };
 try { bgm.enabled = localStorage.getItem("ops-bgm") !== "off"; } catch (e) {}
 function bgmButton() { return document.getElementById("bgm-toggle"); }
@@ -137,14 +137,22 @@ function offLabel(d) { return d.off || "연차"; }
 function onLeave(d, today) { if (d.off) return true; var l = leaves[jobId(d)], t = today || todayStr(); return !!(l && l.from <= t && t <= l.to); }
 function hmMin(t) { var m = /^(\d{1,2}):(\d{2})$/.exec(t || ""); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null; }
 function cfg() {
-  var c = store.cfg.main || {}, o = { ls: "12:00", le: "13:00", oe: "18:00" };
+  var c = store.cfg.main || {}, o = { ls: "12:00", le: "13:00", oe: "18:00", bossVisit: c.bossVisit === true };
   ["ls", "le", "oe"].forEach(function (k) { if (hmMin(c[k]) !== null) o[k] = c[k]; });
   if (hmMin(o.le) <= hmMin(o.ls)) { o.ls = "12:00"; o.le = "13:00"; }
   return o;
 }
+function bossVisitOn() { return !!(store.cfg.main && store.cfg.main.bossVisit === true); }
 function nowMin(now) { var t = new Date(now || Date.now()); return t.getHours() * 60 + t.getMinutes(); }
 function isOT(d) { var o = store.ot[jobId(d)]; return !!(o && o.d === todayStr()); }
 function isGone(d, now) { return nowMin(now) >= hmMin(cfg().oe) && !isOT(d); }
+function shouldSitAtDesk(d, now) {
+  now = now || Date.now();
+  if (WORLD_THEME === "office" && bossVisitOn()) return !onLeave(d) && !isGone(d, now) && !presenceOf(d, now) && !inActiveMeeting(d);
+  var p = store.pres[jobId(d)], minute = nowMin(now), end = hmMin(cfg().oe);
+  var working = d.ext ? !presenceOf(d, now) : p && p.s === "work" && typeof p.at === "number" && now - p.at < 3600000;
+  return !!(working && minute >= 540 && (minute < end || isOT(d)));
+}
 function levelOf(d) { return Math.max(1, Math.min(99, Math.round(power(d) / 13))); }
 function presenceOf(d, now) {
   now = now || Date.now();
@@ -264,7 +272,7 @@ function batteryOf(d, now) {
   return Math.max(0, Math.round(base * (1 - ((current - start) / (leave - start)) * 0.65)));
 }
 function power(d) { return statOf(d).reduce(function (a, b) { return a + b; }, 0); }
-function rarity(lv) { return lv >= 50 ? ["전설", "#f4c95d", "r-legend"] : lv >= 38 ? ["영웅", "#e6e9f5", ""] : lv >= 26 ? ["희귀", "#8fa3d6", ""] : ["일반", "#6b7399", ""]; }
+function rarity(lv) { return lv >= 50 ? ["전설", "#f4c95d", "r-legend"] : lv >= 38 ? [WORLD_THEME === "office" ? "직원" : "영웅", "#e6e9f5", ""] : lv >= 26 ? ["희귀", "#8fa3d6", ""] : ["일반", "#6b7399", ""]; }
 
 function spriteRects(d, step) {
   var r = rng(hash(d.bn || d.n)), out = [];
@@ -308,7 +316,7 @@ function spriteRects(d, step) {
   }
   /* 얼굴 */
   R(2, 2, 10, 9, skin); R(3, 11, 8, 1, skin);
-  R(2, 10, 10, 1, "#000", 0.06);
+  if (!f) R(2, 10, 10, 1, "#000", 0.06);
   /* 머리카락 */
   R(3, 1, 8, 1, hair); R(2, 2, 10, 3, hair);
   if (!f && style === 2) { R(2, 5, 4, 1, hair); R(11, 5, 1, 1, hair); }
@@ -436,29 +444,30 @@ function seatEditor(d) {
   var cur = deskFor(d), occ = {}, h = "";
   DATA.forEach(function (m) { var sd = deskFor(m); if (sd) occ[sd.idx] = m; });
   SEATS.forEach(function (s) {
-    if (s.kind !== "person" && s.kind !== "vacant") return;
+    if (s.kind !== "person") return;
     var o = occ[s.idx], isCur = !!cur && s.idx === cur.idx;
-    var pos = (Math.round((s.cx - OX - CELLW / 2) / CELLW) + 1) + "열 " + (Math.floor((s.ry - OY) / ROWH) + 1) + "행";
-    h += '<button type="button" class="sw' + (isCur ? " cur" : "") + (o ? "" : " vac") + '" data-s="' + s.idx + '"' + (isCur ? " disabled" : "") + ' title="' + pos + '">' + (isCur ? "지금 자리 · " : "") + (o ? esc(o.n) : "빈 자리 · " + pos) + "</button>";
+    var pos = (s.row + 1) + "-" + (s.col + 1), spoken = (s.row + 1) + "행 " + (s.col + 1) + "열";
+    h += '<button type="button" class="sw' + (isCur ? " cur" : "") + (o ? " occupied" : " vac") + '" data-s="' + s.idx + '"' + (isCur || o ? " disabled" : "") + ' title="' + spoken + '" aria-label="' + (isCur ? "내 좌석, " : o ? "사용 중, " : "빈 자리, ") + spoken + '">' + (isCur ? "내 자리 " : o ? "점유 " : "") + pos + "</button>";
   });
-  return '<div class="jobedit" id="seatpanel" hidden><div class="mlabel">자리 교체 — 사람을 고르면 서로 자리를 바꾸고, 빈 자리를 고르면 그 자리로 옮겨요</div><div class="recs">' + h + "</div>" +
-    '<div class="jrow"><button type="button" class="sreset">원래 자리로</button><button type="button" class="jcancel panel-close" aria-label="닫기">✕</button></div>' +
+  return '<div class="jobedit" id="seatpanel" hidden><div class="mlabel">좌석 선택 — 빈 자리만 선택할 수 있어요</div><div class="recs">' + h + "</div>" +
+    '<div class="jrow"><button type="button" class="sreset">자리 비우기</button><button type="button" class="jcancel panel-close" aria-label="닫기">✕</button></div>' +
     '<div class="jstatus" role="status"></div></div>';
 }
 function saveSeat(i, tIdx) {
-  var d = DATA[i], cur = deskFor(d), other = null, ov = {}, src = store.seats && store.seats.main && store.seats.main.m ? store.seats.main.m : {};
-  if (!cur || cur.idx === tIdx) return;
-  DATA.forEach(function (m) { var sd = deskFor(m); if (m !== d && sd && sd.idx === tIdx) other = m; });
+  var d = DATA[i], cur = deskFor(d), target = typeof tIdx === "number" ? SEATS[tIdx] : null, ov = {}, src = store.seats && store.seats.main && store.seats.main.m ? store.seats.main.m : {};
+  if (!d || (tIdx !== null && (!target || target.kind !== "person")) || (cur && cur.idx === tIdx)) return;
+  if (target && DATA.some(function (m) { var sd = deskFor(m); return m !== d && sd && sd.idx === target.idx; })) {
+    var status = document.querySelector("#seatpanel .jstatus");
+    if (status) status.textContent = "이미 다른 캐릭터가 선택한 자리예요.";
+    return;
+  }
   Object.keys(src).forEach(function (k) { ov[k] = src[k]; });
-  ov[jobId(d)] = tIdx;
-  if (other) ov[jobId(other)] = cur.idx;
-  DATA.forEach(function (m) { var b = baseSeatOf(m); if (b && ov[jobId(m)] === b.idx) delete ov[jobId(m)]; });
+  if (target) ov[jobId(d)] = target.idx; else delete ov[jobId(d)];
   commit("seats", "main", Object.keys(ov).length ? { m: ov } : null, function () { applySeats(false); syncIntruders(false); openSheet(i, null); }, "#seatpanel .jstatus");
 }
 function resetSeat(i) {
-  var b = baseSeatOf(DATA[i]), cur = deskFor(DATA[i]);
-  if (!b || !cur || cur.idx === b.idx) { hideEditor(); return; }
-  saveSeat(i, b.idx);
+  if (!deskFor(DATA[i])) { hideEditor(); return; }
+  saveSeat(i, null);
 }
 function attMode() { var b = document.querySelector("#attpanel .att[aria-pressed=true]"); return b ? b.dataset.a : "in"; }
 function setAtt(a) {
@@ -604,7 +613,7 @@ function renderGrid() {
       '<div class="cname">' + nameHtml(d.n) + '</div><div class="cclass">' + esc(tline(d)) + esc(job(d)) + "</div>" +
       '<div class="pow"><span>전투력</span><span class="bar"><i style="width:' + Math.round(p / 5) + '%"></i></span><span>' + p + "</span></div></button>";
   });
-  document.getElementById("grid").innerHTML = html || '<div class="empty">찾는 영웅이 없어요. 검색어를 바꿔보세요.</div>';
+  document.getElementById("grid").innerHTML = html || '<div class="empty">' + (WORLD_THEME === "office" ? "찾는 직원이 없어요. 검색어를 바꿔보세요." : "찾는 영웅이 없어요. 검색어를 바꿔보세요.") + "</div>";
   document.getElementById("count").textContent = list.length + " / " + DATA.length + "명";
 }
 
@@ -625,11 +634,11 @@ function openSheet(i, opener) {
     "</div>" +
     (canEdit ? '<div class="sedit" role="group" aria-label="캐릭터 편집">' +
       '<div class="eg"><span class="egl">프로필</span><button type="button" class="mini editnick">닉네임</button><button type="button" class="mini editjob">직업</button><button type="button" class="mini edittitle">직급</button><button type="button" class="mini editskill">스킬</button><button type="button" class="mini editstat">스탯</button><button type="button" class="mini edithp">체력</button></div>' +
-      '<div class="eg"><span class="egl">근무</span>' + (d.off ? "" : '<button type="button" class="mini editatt">근태</button>') + '<button type="button" class="mini editpres">상태</button></div>' +
+      '<div class="eg"><span class="egl">근무</span>' + (d.off ? "" : '<button type="button" class="mini editatt">근태</button>') + '<button type="button" class="mini editpres">상태</button><button type="button" class="mini editseat">자리</button></div>' +
       (d.ext ? "" : '<div class="eg"><span class="egl">소속</span><button type="button" class="mini editmove">전출</button></div>') + "</div>" : "") +
     '<div class="attline' + (off ? " off" : "") + '">근태 · ' + esc(attText(d)) + "</div>" +
     (snackNow()[uOf(d)] ? '<div class="snkline">🍪 우리 팀 간식 당번 · ~' + md(snackNow()[uOf(d)].to) + " · " + esc(snackNow()[uOf(d)].items.join(", ")) + "</div>" : "") +
-    (canEdit ? jobEditor(d) + nickEditor(d) + titleEditor(d) + skillEditor(d) + statEditor(d) + healthEditor(d) + presEditor(d) + attEditor(d) + (d.ext ? "" : moveEditor(d)) + (deskFor(d) ? seatEditor(d) : "") : "") +
+    (canEdit ? jobEditor(d) + nickEditor(d) + titleEditor(d) + skillEditor(d) + statEditor(d) + healthEditor(d) + presEditor(d) + attEditor(d) + (d.ext ? "" : moveEditor(d)) + seatEditor(d) : "") +
     '<div class="tasks"><div class="mlabel">맡은 업무<b id="tcount"></b></div><ul class="tlist" id="tlist"></ul>' +
     (canEdit ? '<div class="jrow"><input id="tin" type="text" maxlength="60" placeholder="업무 추가 (Enter)" aria-label="업무 내용"><button type="button" class="tadd">추가</button></div>' : "") +
     '<div class="jstatus" id="tstatus" role="status"></div></div>' +
@@ -751,44 +760,29 @@ var mapEl = document.getElementById("map"), mctx = mapEl.getContext("2d");
 mctx.imageSmoothingEnabled = false;
 var reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
-/* 좌석표: [열, 행, 이름] — 이름이 비어 있으면 일반 자리, "@PC", "@퍼블"은 사람이 없는 공용 자리 */
-var LAYOUT = [
-  [1, 0, ""], [2, 0, ""], [3, 0, ""], [4, 0, ""], [5, 0, ""], [6, 0, ""], [7, 0, ""],
-  [0, 1, "@FTP"], [1, 1, "@ER"], [2, 1, ""], [4, 1, ""], [5, 1, ""], [6, 1, ""], [7, 1.5, ""],
-  [0, 2, ""], [1, 2, ""], [2, 2, ""], [4, 2, ""], [5, 2, ""], [6, 2, ""],
-  [0, 3, ""], [1, 3, ""], [2, 3, ""], [4, 3, ""], [5, 3, ""], [6, 3, ""], [7, 3, ""],
-  [0, 4, "@공석"], [1, 4, ""], [2, 4, "@공석"], [4, 4, ""], [5, 4, ""], [6, 4, ""], [7, 4, ""],
-  [0, 5, ""], [1, 5, ""], [2, 5, "@공석"], [4, 5, ""], [5, 5, ""], [6, 5, "@퍼블"], [7, 5, "@퍼블"]
-];
 var SEATS = [], SEATBY = {};
-LAYOUT.forEach(function (a, idx) {
-  var cx = OX + a[0] * CELLW + CELLW / 2, ry = OY + a[1] * ROWH, nm = a[2], kind = nm.charAt(0) === "@" ? (nm === "@퍼블" ? "pub" : nm === "@공석" ? "vacant" : "pc") : "person";
-  var s = { idx: idx, cx: cx, ry: ry, x: cx - CW / 2, y: ry + 6, kind: kind, n: kind === "person" ? nm : nm.slice(1) };
+for (var row = 0; row < 7; row++) for (var col = 0; col < 7; col++) {
+  var idx = row * 7 + col, cx = 100 + col * 120, ry = 62 + row * 85;
+  var kind = idx === 7 || idx === 8 ? "pc" : "person", nm = idx === 7 ? "ftp" : idx === 8 ? "ER" : "";
+  var s = { idx: idx, cx: cx, ry: ry, x: cx - CW / 2, y: ry + 6, kind: kind, n: nm, col: col, row: row };
   SEATS.push(s);
-  if (kind === "person" && nm) SEATBY[nm] = s;
-});
-
-/* 자리 교체: store.seats.main.m = { 사람id: 좌석번호 } 로 기본 좌석표를 덮어써요 */
-var LEAD = "#ff2bd6", SEATNOW = {};
-function baseSeatOf(d) {
-  return null; /* 자리 배정 없음: 모두 서서 돌아다녀요 */
-  if (d.ext) return null;
-  var s = typeof d.seat === "number" ? SEATS[d.seat] : (d.n ? SEATBY[d.n] : null);
-  return s && (s.kind === "person" || s.kind === "vacant") ? s : null;
 }
+
+/* 좌석 선택: store.seats.main.m = { 사람id: 좌석번호 } */
+var LEAD = "#ff2bd6", SEATNOW = {};
 function computeSeatNow() {
-  var ov = store.seats && store.seats.main && store.seats.main.m && typeof store.seats.main.m === "object" ? store.seats.main.m : {}, taken = {}, todo = [];
+  var ov = store.seats && store.seats.main && store.seats.main.m && typeof store.seats.main.m === "object" ? store.seats.main.m : {}, taken = {}, visit = WORLD_THEME === "office" && bossVisitOn();
   SEATNOW = {};
   DATA.forEach(function (d) {
-    var base = baseSeatOf(d);
-    if (!base) return;
-    var w = ov[jobId(d)], s = typeof w === "number" && SEATS[w] && (SEATS[w].kind === "person" || SEATS[w].kind === "vacant") ? SEATS[w] : base;
-    if (!taken[s.idx]) { taken[s.idx] = 1; SEATNOW[jobId(d)] = s; } else todo.push([d, base]);
+    if (visit && !shouldSitAtDesk(d)) return;
+    var idx = ov[jobId(d)], s = typeof idx === "number" ? SEATS[idx] : null;
+    if (s && s.kind === "person" && !taken[s.idx]) { taken[s.idx] = 1; SEATNOW[jobId(d)] = s; }
   });
-  todo.forEach(function (p) {
-    var s = !taken[p[1].idx] ? p[1] : null;
-    if (!s) SEATS.forEach(function (c) { if (!s && (c.kind === "person" || c.kind === "vacant") && !taken[c.idx]) s = c; });
-    if (s) { taken[s.idx] = 1; SEATNOW[jobId(p[0])] = s; }
+  if (visit) DATA.forEach(function (d) {
+    if (!shouldSitAtDesk(d) || SEATNOW[jobId(d)]) return;
+    var seat = null;
+    SEATS.forEach(function (candidate) { if (!seat && candidate.kind === "person" && !taken[candidate.idx]) seat = candidate; });
+    if (seat) { taken[seat.idx] = 1; SEATNOW[jobId(d)] = seat; }
   });
 }
 computeSeatNow();
@@ -991,10 +985,75 @@ function paintSpaceMap(c) {
   });
   c.textAlign = "left"; c.globalAlpha = 1;
 }
+function paintOfficeMap(c) {
+  var x, y, k, m = MEET, rooms = [];
+  c.fillStyle = "#211d1a"; c.fillRect(0, 0, MAP_W, MAP_H);
+  c.fillStyle = "#34302c"; c.fillRect(16, 10, 928, 690);
+  for (y = 10; y < 700; y += 40) {
+    c.fillStyle = y % 80 ? "#38332f" : "#3b3632"; c.fillRect(16, y, 928, 39);
+    c.strokeStyle = "#302b28"; c.lineWidth = 1; c.beginPath(); c.moveTo(16, y + 39); c.lineTo(944, y + 39); c.stroke();
+    for (x = 16 + (y % 80 ? 0 : 58); x < 944; x += 116) { c.beginPath(); c.moveTo(x, y); c.lineTo(x, y + 39); c.stroke(); }
+  }
+  c.fillStyle = "#242a2a"; c.fillRect(16, 10, 928, 34); c.fillRect(16, 668, 928, 32);
+  c.fillStyle = "#586360"; c.fillRect(26, 16, 908, 3); c.fillRect(26, 674, 908, 3);
+  for (x = 38; x < 920; x += 112) {
+    c.fillStyle = "#1a2425"; c.fillRect(x, 20, 94, 19);
+    c.fillStyle = "#5b8586"; c.fillRect(x + 3, 22, 88, 14);
+    c.fillStyle = "#d7e5d9"; c.globalAlpha = 0.24; c.fillRect(x + 6, 23, 37, 2); c.globalAlpha = 1;
+  }
+  c.fillStyle = "#282522"; c.fillRect(30, 48, 900, 606);
+  c.fillStyle = "#45403b"; c.fillRect(34, 52, 892, 598);
+  c.fillStyle = "#403a35"; c.globalAlpha = 0.65;
+  for (x = 34; x < 926; x += 60) c.fillRect(x, 52, 1, 598);
+  c.globalAlpha = 1;
+  c.fillStyle = "#282522";
+  SEATS.forEach(function (s) {
+    var left = s.cx - 45, top = s.ry + 4;
+    c.fillRect(left, top, 90, 4);
+    c.fillRect(left, top, 3, 30);
+    c.fillRect(left + 87, top, 3, 30);
+    if (s.kind === "person") { c.fillStyle = "#77736d"; c.fillRect(s.cx - 10, s.ry + 65, 20, 6); c.fillRect(s.cx - 2, s.ry + 71, 4, 6); }
+    c.fillStyle = "#282522";
+  });
+  c.fillStyle = "#292d2c"; c.fillRect(m.x, m.y, m.w, m.h);
+  c.fillStyle = "#141a1b"; c.fillRect(m.x + 3, m.y + 3, m.w - 6, m.h - 6);
+  c.strokeStyle = "#8d9994"; c.lineWidth = 2;
+  for (k = 0; k < 3; k++) {
+    var room = { x: m.x + 8, y: 64 + k * 210, w: m.w - 16, h: 186 };
+    rooms.push(room);
+    c.fillStyle = "#4b504e"; c.fillRect(room.x, room.y, room.w, room.h);
+    c.strokeRect(room.x + 1, room.y + 1, room.w - 2, room.h - 2);
+    c.fillStyle = "#262c2d"; c.fillRect(room.x + 5, room.y + 5, room.w - 10, room.h - 10);
+    c.fillStyle = "#78908f"; c.fillRect(room.x + 12, room.y + 8, room.w - 24, 3);
+    c.fillStyle = "#192122"; c.fillRect(room.x + room.w - 38, room.y + room.h - 5, 26, 8);
+    c.fillStyle = "#d7ded7"; c.font = "700 10px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"; c.textAlign = "left";
+    c.fillText("회의실 0" + (k + 1), room.x + 12, room.y + 26);
+    var table = TABLES[k];
+    c.fillStyle = "#c9c2b7";
+    c.fillRect(table.x - 47, table.y - 8, 14, 16); c.fillRect(table.x + 33, table.y - 8, 14, 16);
+    c.fillRect(table.x - 8, table.y - 32, 16, 12); c.fillRect(table.x - 8, table.y + 20, 16, 12);
+  }
+  c.fillStyle = "#201d1a"; c.fillRect(16, 716, 928, 242);
+  c.fillStyle = "#3d3732"; c.fillRect(24, 724, 912, 226);
+  c.strokeStyle = "#77736d"; c.lineWidth = 2; c.strokeRect(24, 724, 912, 226);
+  c.fillStyle = "#e5e1da"; c.font = "700 13px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"; c.textAlign = "left";
+  c.fillText("프로젝트 팀 워크존", 34, 744);
+  Object.keys(REGIONS).forEach(function (u) {
+    var g = REGIONS[u], color = ucol(u), empty = UNI[u].hidden;
+    c.fillStyle = empty ? "#33302d" : "#4b4540"; c.fillRect(g.x, g.y, g.w, g.h);
+    c.strokeStyle = empty ? "#76736d" : color; c.lineWidth = 2; c.strokeRect(g.x + 1, g.y + 1, g.w - 2, g.h - 2);
+    c.fillStyle = color; c.fillRect(g.x + 8, g.y + 10, g.w - 16, 4);
+    c.fillStyle = "#e0ddd6"; c.font = "700 11px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"; c.textAlign = "center";
+    c.fillText(empty ? "비어 있음" : fit(c, UNI[u].realm, g.w - 12), g.x + g.w / 2, g.y + 34);
+  });
+  c.fillStyle = "#e5e1da"; c.font = "700 13px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif"; c.textAlign = "left";
+  c.fillText("사무실", 32, 64); c.textAlign = "left";
+}
 function paintMap() {
   var c = bg.getContext("2d"), F = FIELD, tx, ty, i, k, rr = rng(7), late = [], m = MEET, fx = 16, fy = 10, fw = 928, fh = 690;
   c.imageSmoothingEnabled = false; c.globalAlpha = 1;
   FIRES = []; TORCHES = [];
+  if (WORLD_THEME === "office") { paintOfficeMap(c); return; }
   if (WORLD_THEME === "space") { paintSpaceMap(c); return; }
   c.fillStyle = T.bg; c.fillRect(0, 0, MAP_W, MAP_H);
   /* 전장 바닥: 풀밭 */
@@ -1113,7 +1172,7 @@ function spaceMeal(x, y) {
   mctx.restore();
 }
 function drawFires() {
-  if (LUNCH.n > 0) {
+  if (LUNCH.n > 0 && WORLD_THEME !== "office") {
     var fl0 = 0.85 + 0.15 * Math.sin(lastT / 120), lx = LUNCH.cx, ly = LUNCH.cy;
     mctx.globalAlpha = 1; fireGlow(lx, ly - 6, 120, (T.night ? 0.5 : 0.28) * fl0);
     mctx.fillStyle = "#3a2414"; mctx.fillRect(lx - 16, ly - 3, 32, 6); mctx.fillStyle = "#5e3e26"; mctx.fillRect(lx - 12, ly - 7, 24, 5);
@@ -1217,9 +1276,9 @@ function snackHit(ev) {
 function areaOf(u) { var g = REGIONS[u]; return { x0: g.x + 10, x1: g.x + g.w - 10 - CW, y0: g.y + 62, y1: g.y + g.h - 10 - CH }; }
 function iAreaOf(u) { var g = REGIONS[u]; return { x0: g.x + 10, x1: g.x + g.w - 10 - IW, y0: g.y + 62, y1: g.y + g.h - 10 - IH }; }
 var OFFICE = { x0: 90, x1: 860, y0: 90, y1: 590 };
-function wanderOf(u) { return REGIONS[u] ? areaOf(u) : OFFICE; }
+function wanderOf(u) { return WORLD_THEME === "office" ? OFFICE : REGIONS[u] ? areaOf(u) : OFFICE; }
 function randIn(a) { return [a.x0 + Math.random() * (a.x1 - a.x0), a.y0 + Math.random() * (a.y1 - a.y0)]; }
-function deskFor(d) { return !d.ext && SEATNOW[jobId(d)] && UNI[uOf(d)].side !== "proj" ? SEATNOW[jobId(d)] : null; }
+function deskFor(d) { return SEATNOW[jobId(d)] || null; }
 function applySeats(initial) {
   computeSeatNow();
   walkers.forEach(function (w) {
@@ -1234,13 +1293,13 @@ function applySeats(initial) {
 }
 var STAND = {};
 function newWalker(d, i) {
-  var u = uOf(d), hd = deskFor(d), a = wanderOf(u), p = hd ? [hd.x, hd.y] : a ? randIn(a) : (STAND[d.n] || [OX, OY]);
+  var u = uOf(d), hd = deskFor(d), a = wanderOf(u), p = hd && shouldSitAtDesk(d) ? [hd.x, hd.y] : a ? randIn(a) : (STAND[d.n] || [OX, OY]);
   return { i: i, id: jobId(d), u: u, a: a, hd: hd, x: p[0], y: p[1], tx: p[0], ty: p[1], wait: Math.random() * 2, speed: 16 + Math.random() * 12, anim: 0, moving: false, route: [], seat: null, mode: "desk", tag: "", pkey: "" };
 }
 var walkers = DATA.map(function (d, i) { return newWalker(d, i); });
-function homeDest(w) { return w.hd ? [w.hd.x, w.hd.y] : w.a ? randIn(w.a) : (STAND[DATA[w.i].n] || [w.x, w.y]); }
+function homeDest(w) { return w.hd && shouldSitAtDesk(DATA[w.i]) ? [w.hd.x, w.hd.y] : w.a ? randIn(w.a) : (STAND[DATA[w.i].n] || [w.x, w.y]); }
 function leaveSpot(w) { return w.hd ? [w.hd.cx - CW / 2, w.hd.ry + 66] : (STAND[DATA[w.i].n] || [w.x, w.y]); }
-function isSitting(w) { return !w.route.length && !w.seat && w.mode === "desk" && w.hd && Math.abs(w.x - w.hd.x) < 1.5 && Math.abs(w.y - w.hd.y) < 1.5; }
+function isSitting(w) { return !w.route.length && !w.seat && w.mode === "desk" && w.hd && shouldSitAtDesk(DATA[w.i]) && Math.abs(w.x - w.hd.x) < 1.5 && Math.abs(w.y - w.hd.y) < 1.5; }
 function rowOfY(y) { return Math.max(0, Math.min(5, Math.floor((y - OY) / ROWH))); }
 function wtop(r) { return OY + r * ROWH + 66; }
 function zoneOf(x, y) { return x >= EDGE - 10 ? "meet" : (y >= LOWER_Y ? "low" : "off"); }
@@ -1319,6 +1378,10 @@ function meetingList() {
     return m && typeof m.t === "string" ? { id: id, t: m.t, m: Array.isArray(m.m) ? m.m.filter(function (x) { return typeof x === "string"; }) : [], on: !!m.on, at: +m.at || 0 } : null;
   }).filter(Boolean).sort(function (a, b) { return a.at - b.at; });
 }
+function inActiveMeeting(d) {
+  var id = jobId(d);
+  return meetingList().some(function (m) { return m.on && m.m.indexOf(id) >= 0; });
+}
 function computeSeats() {
   var byId = {}, taken = {}, out = {}, today = todayStr();
   DATA.forEach(function (d) { byId[jobId(d)] = d; });
@@ -1337,7 +1400,7 @@ function computeSeats() {
 }
 function syncMeetings(initial) {
   var seats = computeSeats(), today = todayStr(), now = Date.now(), lunchers = [];
-  walkers.forEach(function (w) { var d0 = DATA[w.i]; if (!seats[w.id] && !onLeave(d0, today) && !isGone(d0, now) && presenceOf(d0, now) === "lunch") lunchers.push(w.id); });
+  if (WORLD_THEME !== "office") walkers.forEach(function (w) { var d0 = DATA[w.i]; if (!seats[w.id] && !onLeave(d0, today) && !isGone(d0, now) && presenceOf(d0, now) === "lunch") lunchers.push(w.id); });
   lunchers.sort(); LUNCH.n = lunchers.length;
   walkers.forEach(function (w) {
     var d = DATA[w.i], s = seats[w.id], mode, tag = "", key, quick = initial || reduceMotion || w.mode === "gone", sp, h, t2;
@@ -1345,13 +1408,13 @@ function syncMeetings(initial) {
     else if (isGone(d, now)) mode = "gone";
     else if (s) mode = "meet";
     else { tag = presenceOf(d, now); mode = tag ? "away" : "desk"; }
-    key = mode + ":" + (mode === "meet" ? s.k + ":" + s.x + ":" + s.y : "") + tag + (mode === "away" && tag === "lunch" ? ":" + lunchers.indexOf(w.id) + "/" + lunchers.length : "");
+    key = WORLD_THEME + ":" + mode + ":" + (mode === "meet" ? s.k + ":" + s.x + ":" + s.y : "") + tag + (shouldSitAtDesk(d, now) ? ":working" : ":off-desk") + (mode === "away" && tag === "lunch" ? ":" + lunchers.indexOf(w.id) + "/" + lunchers.length : "");
     if (w.pkey === key) return;
     w.pkey = key; w.mode = mode; w.tag = tag; w.seat = mode === "meet" ? s : null;
     if (mode === "gone") { w.route = []; w.moving = false; w.seat = null; }
     else if (mode === "leave") { sp = leaveSpot(w); w.route = []; w.moving = false; w.x = sp[0]; w.y = sp[1]; w.tx = w.x; w.ty = w.y; }
     else if (mode === "meet") { if (quick) jump(w, [s.x, s.y]); else goTo(w, [s.x, s.y]); }
-    else if (mode === "away") { t2 = tag === "lunch" ? lunchSpot(lunchers.indexOf(w.id), lunchers.length) : awayDest(); if (quick) jump(w, t2); else goTo(w, t2); }
+    else if (mode === "away") { t2 = tag === "lunch" && WORLD_THEME !== "office" ? lunchSpot(lunchers.indexOf(w.id), lunchers.length) : awayDest(); if (quick) jump(w, t2); else goTo(w, t2); }
     else { h = homeDest(w); if (quick) jump(w, h); else goTo(w, h); }
   });
   if (typeof updateOT === "function") updateOT();
@@ -1377,7 +1440,12 @@ function update(dt) {
       else goTo(w, awayDest());
       return;
     }
-    if (w.hd || !w.a) { w.moving = false; return; }
+    if (w.hd && shouldSitAtDesk(DATA[w.i])) {
+      if (Math.abs(w.x - w.hd.x) > 1.5 || Math.abs(w.y - w.hd.y) > 1.5) goTo(w, [w.hd.x, w.hd.y]);
+      else w.moving = false;
+      return;
+    }
+    if (!w.a) { w.moving = false; return; }
     if (w.wait > 0) {
       w.wait -= dt; w.moving = false;
       if (w.wait <= 0) { w.tx = w.a.x0 + Math.random() * (w.a.x1 - w.a.x0); w.ty = w.a.y0 + Math.random() * (w.a.y1 - w.a.y0); }
@@ -1485,12 +1553,22 @@ function drawSpaceBodies() {
   mctx.globalAlpha = 1;
 }
 function drawMonitor(s, lit) {
-  mctx.fillStyle = "#5b638f"; mctx.fillRect(s.cx - 23, s.ry + 12, 46, 24);
-  mctx.fillStyle = lit ? "#2a8ea3" : "#141830"; mctx.fillRect(s.cx - 21, s.ry + 14, 42, 20);
-  mctx.fillStyle = "#5b638f"; mctx.fillRect(s.cx - 3, s.ry + 36, 6, 3);
+  var office = WORLD_THEME === "office";
+  mctx.fillStyle = office ? "#22201e" : "#5b638f"; mctx.fillRect(s.cx - 18, s.ry + 12, 36, 21);
+  mctx.fillStyle = lit ? (office ? "#4c9b91" : "#2a8ea3") : (office ? "#151819" : "#141830"); mctx.fillRect(s.cx - 16, s.ry + 14, 32, 17);
+  mctx.fillStyle = office ? "#4c4944" : "#5b638f"; mctx.fillRect(s.cx - 3, s.ry + 33, 6, 4);
 }
 function drawDesk(s, tint, lit) {
   var x = s.cx - 42, y = s.ry + 38;
+  if (WORLD_THEME === "office") {
+    x = s.cx - 34;
+    mctx.fillStyle = "#211a16"; mctx.fillRect(x + 3, y + 8, 62, 19);
+    mctx.fillStyle = "#f3f1eb"; mctx.fillRect(x, y, 68, 9);
+    mctx.fillStyle = "#ffffff"; mctx.fillRect(x + 1, y + 1, 66, 6);
+    mctx.fillStyle = "#c8c5be"; mctx.fillRect(x, y + 8, 68, 2);
+    mctx.fillStyle = "#8b8176"; mctx.fillRect(x + 5, y + 10, 3, 18); mctx.fillRect(x + 60, y + 10, 3, 18);
+    return;
+  }
   mctx.fillStyle = shade(tint, 0.45); mctx.fillRect(x, y + 10, 84, 20);
   mctx.fillStyle = shade(tint, 0.82); mctx.fillRect(x, y, 84, 10);
   mctx.fillStyle = tint; mctx.fillRect(x, y, 84, 2); mctx.fillRect(x, y + 28, 84, 2);
@@ -1531,12 +1609,12 @@ function draw() {
     mctx.beginPath(); mctx.ellipse(tb.x, tb.y, 28, 17, 0, 0, Math.PI * 2); mctx.fill();
     mctx.lineWidth = 2; mctx.strokeStyle = info ? "#f4c95d" : "#3a2c1e"; mctx.stroke();
     mctx.font = "500 11px 'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif";
-    label(info ? fit(mctx, info.t, 112) : "빈 작전 탁자", tb.x, tb.y + 82, !info);
+    label(info ? fit(mctx, info.t, 112) : WORLD_THEME === "office" ? "빈 회의실" : "빈 작전 탁자", tb.x, tb.y + 82, !info);
   });
   var showNames = document.getElementById("names").checked, today = todayStr(), owner = {};
   walkers.forEach(function (w) { if (w.hd) owner[w.hd.idx] = w; });
   SEATS.forEach(function (s) {
-    if (!owner[s.idx]) return;
+    if (!owner[s.idx] && WORLD_THEME !== "office") return;
     var w = owner[s.idx], d = w ? DATA[w.i] : null, sit = w ? isSitting(w) : false, on = d ? mapOn(d) : true, off = d ? onLeave(d, today) : false;
     var tint = d ? ucol(uOf(d)) : "#5b638f", nm = d ? jobId(d) : "";
     mctx.globalAlpha = on ? 1 : 0.28;
@@ -1545,8 +1623,8 @@ function draw() {
       mctx.save(); mctx.globalAlpha = (0.35 + 0.45 * pulse) * (off ? 0.5 : 1); mctx.strokeStyle = LEAD; mctx.lineWidth = 2; mctx.shadowColor = LEAD; mctx.shadowBlur = 18;
       mctx.strokeRect(s.cx - 46, s.ry + 4, 92, 68); mctx.restore();
     }
-    mctx.fillStyle = "#1e2340"; mctx.fillRect(s.cx - 16, s.ry + 14, 32, 26);
-    drawMonitor(s, s.kind === "pc");
+    mctx.fillStyle = WORLD_THEME === "office" ? "#d7d0c4" : "#1e2340"; mctx.fillRect(s.cx - 16, s.ry + 14, 32, 26);
+    drawMonitor(s, s.kind === "pc" || sit);
     if (sit) mctx.drawImage(spr[w.i][off ? 1 : 0][0], 0, 0, CW, 32, s.x, s.y, CW, 32);
     drawDesk(s, tint, s.kind === "pc");
     if (d && sn[uOf(d)] && !off) { var its = sn[uOf(d)].items; mctx.drawImage(foodIcon(its[s.idx % its.length]), s.cx + 24, s.ry + 44); }
@@ -1557,7 +1635,8 @@ function draw() {
       mctx.fillStyle = "#fff"; mctx.fillText(t, s.cx - 36, s.ry + 61);
     }
     if (sit && on && d && isOT(d)) otBadge(s.cx + 18, s.ry + 2);
-    if (!d) label(s.kind === "person" ? "공석" : s.n, s.cx, s.ry + 9, true);
+    if (!d) label(s.kind === "person" ? "빈 자리" : s.n, s.cx, s.ry + 9, true);
+    else if (WORLD_THEME === "office" && !sit) label(fit(mctx, d.n, 76), s.cx, s.ry + 9, true);
     else if (sit && on && (showNames || hover === w)) label(nameLines(d, off ? " · " + offLabel(d) : ""), s.cx, s.y - 5, off);
     if (sit && on && d) drawHealthBattery(s.x, s.y, d);
     if (sit && on && hover === w) arrow(s.cx, s.y - 27);
@@ -1572,7 +1651,8 @@ function draw() {
     else mctx.drawImage(spr[w.i][off ? 1 : 0][fr], x, y);
     if (on) drawHealthBattery(x, y, d);
     if (w.mode === "away" && w.tag === "lunch") {
-      if (!w.route.length) { if (WORLD_THEME === "space") spaceMeal(x + CW - 5, y + 12); else drumstick(x + CW - 5, y + 12 + (Math.sin(lastT / 170 + w.i * 1.7) > 0.3 ? -3 : 0)); }
+      if (WORLD_THEME === "office") mctx.drawImage(foodIcon("밥"), x + 6, y - 22);
+      else if (!w.route.length) { if (WORLD_THEME === "space") spaceMeal(x + CW - 5, y + 12); else drumstick(x + CW - 5, y + 12 + (Math.sin(lastT / 170 + w.i * 1.7) > 0.3 ? -3 : 0)); }
       else { if (WORLD_THEME === "space") spaceMeal(x + 8, y - 26); else drumstick(x + 8, y - 26); }
     } else if (w.mode === "away" && w.tag) mctx.drawImage(foodIcon("커피"), x + 4, y - 32);
     if (on && (showNames || hover === w || w.mode === "away")) label(nameLines(d, off ? " · " + offLabel(d) : (w.mode === "away" ? (w.tag === "lunch" ? (WORLD_THEME === "space" ? " · 우주식량" : " · 점심") : " · 휴식") : (gn ? " · 퇴근" : ""))), x + CW / 2, y - 5, off || gn);
@@ -1646,8 +1726,8 @@ mapEl.addEventListener("mousemove", function (ev) {
   if (command) {
     mapEl.style.cursor = "pointer";
     tip.innerHTML = command === "meet"
-      ? (WORLD_THEME === "space" ? "<b>우주 관제소</b> · 눌러서 회의를 만들어요" : "<b>작전 막사</b> · 눌러서 회의를 만들어요")
-      : (WORLD_THEME === "space" ? "<b>우주항</b> · 눌러서 프로젝트 팀을 만들어요" : "<b>용병 진영</b> · 눌러서 프로젝트 팀을 만들어요");
+      ? (WORLD_THEME === "space" ? "<b>우주 관제소</b> · 눌러서 회의를 만들어요" : WORLD_THEME === "office" ? "<b>회의실</b> · 눌러서 회의를 만들어요" : "<b>작전 막사</b> · 눌러서 회의를 만들어요")
+      : (WORLD_THEME === "space" ? "<b>우주항</b> · 눌러서 프로젝트 팀을 만들어요" : WORLD_THEME === "office" ? "<b>프로젝트 구역</b> · 눌러서 팀을 만들어요" : "<b>용병 진영</b> · 눌러서 프로젝트 팀을 만들어요");
   } else if (h) {
     var d = DATA[h.i], sk = snackNow()[uOf(d)];
     tip.innerHTML = "<b>" + nameHtml(d.n) + "</b>" + (ttl(d) ? " · " + esc(ttl(d)) : "") + "<br>" + esc(job(d)) + (onLeave(d) ? "<br>" + esc(offLabel(d)) : "") + (h.seat && !h.route.length ? "<br>회의 중" : "") + (h.mode === "away" ? "<br>" + (h.tag === "lunch" ? (WORLD_THEME === "space" ? "우주식량 중" : "점심 중") : "휴식 중") : "") + (openTasks(d).length ? "<br>맡은 업무 " + openTasks(d).length + "건" : "") + (sk ? "<br>간식 당번 · " + esc(sk.items.join(", ")) : "");
@@ -1784,7 +1864,7 @@ function renderProjectHeroPick() {
   box.innerHTML = heroes.map(function (d) {
     var id = jobId(d);
     return '<button type="button" class="pk" data-hero-id="' + esc(id) + '" aria-pressed="' + !!pNewHeroes[id] + '">' + esc(d.n) + '</button>';
-  }).join("") || '<span class="tempty">아직 등록된 영웅이 없습니다.</span>';
+  }).join("") || '<span class="tempty">' + (WORLD_THEME === "office" ? "아직 등록된 직원이 없습니다." : "아직 등록된 영웅이 없습니다.") + "</span>";
 }
 function keepForm(root, fn) {
   var vals = {}, act = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.k : null, els = root.querySelectorAll("[data-k]"), k;
@@ -2260,19 +2340,24 @@ document.getElementById("views").addEventListener("click", function (e) { var b 
 syncIntruders(true); syncMeetings(true);
 setInterval(function () { syncMeetings(false); }, 5000);
 document.getElementById("autolunch").addEventListener("change", function () { syncMeetings(false); });
-function fillCfg() { var c = cfg(); document.getElementById("cfgls").value = c.ls; document.getElementById("cfgle").value = c.le; document.getElementById("cfgoe").value = c.oe; }
+function fillCfg() { var c = cfg(); document.getElementById("cfgls").value = c.ls; document.getElementById("cfgle").value = c.le; document.getElementById("cfgoe").value = c.oe; document.getElementById("boss-visit").checked = c.bossVisit; syncBossVisitUI(); }
+function saveBossVisit(enabled) {
+  var next = cfg(); next.bossVisit = !!enabled;
+  commit("cfg", "main", next, function () { fillCfg(); applySeats(false); syncMeetings(false); }, "#cfgst");
+}
 function updateOT() {
   var n = DATA.filter(function (d) { return isOT(d) && !onLeave(d); }).length, el = document.getElementById("otcount");
   if (el) el.textContent = n ? "🌙 오늘 야근 " + n + "명" : "";
 }
 ["cfgls", "cfgle", "cfgoe"].forEach(function (id) {
   document.getElementById(id).addEventListener("change", function () {
-    var v = { ls: document.getElementById("cfgls").value, le: document.getElementById("cfgle").value, oe: document.getElementById("cfgoe").value }, st = document.getElementById("cfgst");
+    var current = cfg(), v = { ls: document.getElementById("cfgls").value, le: document.getElementById("cfgle").value, oe: document.getElementById("cfgoe").value, bossVisit: current.bossVisit }, st = document.getElementById("cfgst");
     st.textContent = "";
     if (hmMin(v.ls) === null || hmMin(v.le) === null || hmMin(v.oe) === null || hmMin(v.le) <= hmMin(v.ls)) { st.textContent = "시간을 다시 확인해 주세요 (점심 끝이 시작보다 늦어야 해요)."; fillCfg(); return; }
     commit("cfg", "main", v, function () { fillCfg(); syncMeetings(false); }, "#cfgst");
   });
 });
+document.getElementById("boss-visit").addEventListener("change", function () { saveBossVisit(this.checked); });
 fillCfg();
 setView("map");
 
@@ -2286,16 +2371,52 @@ function setTheme(t, save) {
   spr = DATA.map(function (d) { return makeSprites(d); });
   paintMap();
 }
+function syncBossVisitUI() {
+  var active = bossVisitOn(), control = document.getElementById("boss-visit-control"), checkbox = document.getElementById("boss-visit"), siren = document.getElementById("boss-siren");
+  if (control) control.hidden = WORLD_THEME !== "office";
+  if (checkbox) checkbox.checked = active;
+  if (siren) siren.hidden = WORLD_THEME !== "office" || !active;
+}
+function syncOfficeCopy() {
+  var office = WORLD_THEME === "office", total = document.getElementById("total"), lead = total && total.nextSibling;
+  if (lead) lead.textContent = office ? "명의 직원이 서비스를 지킵니다." : "명의 영웅이 서비스를 지킵니다.";
+  var groups = document.querySelectorAll("#views .nlab"), group = groups[0], roster = document.querySelector('#views [data-v="list"] span'), team = document.querySelector('#views [data-v="team"] span'), teamTitle = document.querySelector("#teampane h2"), projectLabel = document.querySelector("#projpane .project-hero-label"), picker = document.getElementById("project-hero-pick"), map = document.getElementById("map"), world = document.getElementById("world");
+  if (group) group.textContent = office ? "직원" : "영웅";
+  if (groups[1]) groups[1].textContent = office ? "업무" : "군영";
+  if (roster) roster.textContent = office ? "직원 명단" : "영웅 명부";
+  if (team) team.textContent = office ? "직원 관리" : "영웅 모집";
+  if (teamTitle) teamTitle.textContent = office ? "직원 관리" : "영웅 모집";
+  if (projectLabel) projectLabel.textContent = office ? "기존 직원을 프로젝트팀에 합류시키기 (선택)" : "기존 영웅을 팀에 합류시키기 (선택)";
+  if (picker) picker.setAttribute("aria-label", office ? "프로젝트에 합류시킬 기존 직원" : "프로젝트에 합류시킬 기존 영웅");
+  var projectNav = document.querySelector('#views [data-v="proj"] span'), meetingNav = document.querySelector('#views [data-v="meet"] span'), snackNav = document.querySelector('#views [data-v="snack"] span'), chatNav = document.querySelector('#views [data-v="chat"] span'), projectTitle = document.querySelector("#projpane h2"), meetingTitle = document.querySelector("#meetpane h2"), snackTitle = document.querySelector("#snackpane h2"), mapGuide = document.getElementById("map-guide"), meetingGuide = document.getElementById("meeting-guide");
+  if (projectNav) projectNav.textContent = office ? "프로젝트 팀" : "용병단";
+  if (meetingNav) meetingNav.textContent = office ? "회의" : "작전 회의";
+  if (snackNav) snackNav.textContent = office ? "간식" : "보급";
+  if (chatNav) chatNav.textContent = office ? "공지·채팅" : "전령";
+  if (projectTitle) projectTitle.textContent = office ? "프로젝트 팀" : "용병단";
+  if (meetingTitle) meetingTitle.textContent = office ? "회의" : "작전 회의";
+  if (snackTitle) snackTitle.textContent = office ? "간식 담당" : "보급 담당";
+  if (mapGuide) mapGuide.textContent = office ? "49개 자리로 구성된 사무실이에요. 47개 직원 좌석과 두 번째 줄 첫 두 칸의 ftp, ER 전용 PC가 있어요. 직원 시트에서 빈 자리를 선택할 수 있고, 오전 9시부터 퇴근 설정 시간까지 업무중인 직원은 자기 책상에 앉아요. 점심에는 직원들이 모이지 않고 머리 위에 식사 아이콘만 표시돼요." : "캐릭터 시트의 「자리」에서 빈 좌석을 선택할 수 있어요. 다른 캐릭터가 고른 좌석은 선택할 수 없고, 오전 9시부터 퇴근 설정 시간까지 「업무중」 상태인 캐릭터는 자기 책상에 앉아요. 점심·휴식·회의·연차 중에는 자리를 비웁니다.";
+  if (meetingGuide) meetingGuide.textContent = office ? "사무실 오른쪽에 분리된 회의실 3개가 있어요. 회의 이름과 참석자를 정하면 지정된 회의실에 표시되고, 회의가 끝나면 각자 자리로 돌아갑니다. 연차인 직원은 참석할 수 없고, 회의실마다 최대 8명까지 참석할 수 있어요." : "회의 이름과 참석자를 정하면 지도 아래쪽 회의실 테이블에 표시돼요. 회의가 끝나면 각자 자리로 돌아가고, 연차인 사람은 참석할 수 없어요. 테이블은 3개이며 각 회의에 최대 8명까지 참석할 수 있어요.";
+  if (map) map.setAttribute("aria-label", office ? "49개 자리로 구성된 사무실. 47개 직원 좌석과 두 번째 줄의 ftp, ER 전용 PC가 있습니다." : "멀티버스 지도. 영웅 캐릭터가 움직이고, 회의실과 프로젝트 구역이 있습니다.");
+  if (world) world.setAttribute("aria-label", office ? "사무실 지도" : "멀티버스 지도");
+  syncBossVisitUI();
+}
 function setWorldTheme(theme, save) {
-  WORLD_THEME = theme === "space" ? "space" : "battlefield";
+  WORLD_THEME = theme === "space" || theme === "battlefield" ? theme : "office";
   document.documentElement.setAttribute("data-world-theme", WORLD_THEME);
   if (save) { try { localStorage.setItem("ops-world-theme", WORLD_THEME); } catch (e) {} }
   var buttons = document.querySelectorAll("#world-themebar .side");
   buttons.forEach(function (button) { button.setAttribute("aria-pressed", String(button.dataset.worldTheme === WORLD_THEME)); });
+  syncOfficeCopy();
   spr = DATA.map(function (d) { return makeSprites(d); });
   UC = {};
   paintMap();
+  walkers.forEach(function (walker) { walker.a = wanderOf(walker.u); });
+  applySeats(false); syncMeetings(false);
   renderGrid();
+  if (state.view === "proj") renderProjects();
+  if (state.view === "team") renderTeam();
   if (openIdx !== null) openSheet(openIdx, null);
   if (bgm.playing) { stopBgm(); startBgm(); }
 }
@@ -2382,8 +2503,8 @@ if (window.claude && window.claude.use) {
     }, function () {});
     db.collection("cfg").onSnapshot(function (snap) {
       var m = {};
-      snap.docs.forEach(function (x) { var v = x.data(); if (v && typeof v.ls === "string") m[x.id] = { ls: v.ls, le: v.le, oe: v.oe }; });
-      store.cfg = m; fillCfg(); syncMeetings(false);
+      snap.docs.forEach(function (x) { var v = x.data(); if (v && typeof v.ls === "string") m[x.id] = { ls: v.ls, le: v.le, oe: v.oe, bossVisit: v.bossVisit === true }; });
+      store.cfg = m; fillCfg(); applySeats(false); syncMeetings(false);
     }, function () {});
     db.collection("ot").onSnapshot(function (snap) {
       var m = {};
