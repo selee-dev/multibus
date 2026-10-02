@@ -247,6 +247,8 @@ h1 em { font-style: normal; color: var(--gold); }
 .pane h2 { font-family: var(--font-display); font-weight: 400; font-size: 28px; margin: 0 0 4px; }
 .pane > p { color: var(--muted); margin: 0 0 16px; max-width: 64ch; font-size: 14px; }
 .pform { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+.project-hero-label { margin-top: 12px; }
+#project-hero-pick .pk[aria-pressed="true"] { border-color: var(--lead); color: var(--lead); }
 .pk { min-height: 30px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; font-size: 12.5px; }
 .pk[aria-pressed="true"] { border-color: var(--gold); color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--panel-2)); }
 .pkgrp { margin-bottom: 8px; }

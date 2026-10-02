@@ -1100,6 +1100,18 @@ function drumstick(x, y) {
   mctx.fillStyle = "#c9782c"; mctx.fillRect(x + 3, y + 1, 6, 4); mctx.fillStyle = "#eaa54e"; mctx.fillRect(x + 4, y + 1, 3, 1);
   mctx.fillStyle = "#f5efe0"; mctx.fillRect(x - 4, y + 4, 6, 2); mctx.fillRect(x - 5, y + 3, 2, 2); mctx.fillRect(x - 5, y + 6, 2, 2);
 }
+function spaceMeal(x, y) {
+  x = Math.round(x); y = Math.round(y);
+  var pulse = 0.7 + 0.3 * Math.sin(lastT / 160);
+  mctx.save(); mctx.globalAlpha = 0.9;
+  mctx.strokeStyle = "#78e7ef"; mctx.lineWidth = 1;
+  mctx.beginPath(); mctx.ellipse(x + 4, y + 7, 12 + pulse * 2, 4, 0, 0, Math.PI * 2); mctx.stroke();
+  mctx.fillStyle = "#102c46"; mctx.fillRect(x - 3, y + 1, 14, 11);
+  mctx.fillStyle = "#a9f6ee"; mctx.fillRect(x - 1, y + 3, 10, 2);
+  mctx.fillStyle = "#47c9df"; mctx.fillRect(x, y + 7, 8, 2);
+  mctx.fillStyle = "#dffeff"; mctx.fillRect(x + 3, y - 2, 4, 3);
+  mctx.restore();
+}
 function drawFires() {
   if (LUNCH.n > 0) {
     var fl0 = 0.85 + 0.15 * Math.sin(lastT / 120), lx = LUNCH.cx, ly = LUNCH.cy;
@@ -1560,9 +1572,10 @@ function draw() {
     else mctx.drawImage(spr[w.i][off ? 1 : 0][fr], x, y);
     if (on) drawHealthBattery(x, y, d);
     if (w.mode === "away" && w.tag === "lunch") {
-      if (!w.route.length) drumstick(x + CW - 5, y + 12 + (Math.sin(lastT / 170 + w.i * 1.7) > 0.3 ? -3 : 0)); else drumstick(x + 8, y - 26);
+      if (!w.route.length) { if (WORLD_THEME === "space") spaceMeal(x + CW - 5, y + 12); else drumstick(x + CW - 5, y + 12 + (Math.sin(lastT / 170 + w.i * 1.7) > 0.3 ? -3 : 0)); }
+      else { if (WORLD_THEME === "space") spaceMeal(x + 8, y - 26); else drumstick(x + 8, y - 26); }
     } else if (w.mode === "away" && w.tag) mctx.drawImage(foodIcon("커피"), x + 4, y - 32);
-    if (on && (showNames || hover === w || w.mode === "away")) label(nameLines(d, off ? " · " + offLabel(d) : (w.mode === "away" ? (w.tag === "lunch" ? " · 점심" : " · 휴식") : (gn ? " · 퇴근" : ""))), x + CW / 2, y - 5, off || gn);
+    if (on && (showNames || hover === w || w.mode === "away")) label(nameLines(d, off ? " · " + offLabel(d) : (w.mode === "away" ? (w.tag === "lunch" ? (WORLD_THEME === "space" ? " · 우주식량" : " · 점심") : " · 휴식") : (gn ? " · 퇴근" : ""))), x + CW / 2, y - 5, off || gn);
     if (on && hover === w) arrow(x + CW / 2, y - 27 - (nameParts(d.n).length > 1 ? 13 : 0));
     if (on && isOT(d) && !off) otBadge(x + CW - 2, y - 2);
   });
@@ -1637,7 +1650,7 @@ mapEl.addEventListener("mousemove", function (ev) {
       : (WORLD_THEME === "space" ? "<b>우주항</b> · 눌러서 프로젝트 팀을 만들어요" : "<b>용병 진영</b> · 눌러서 프로젝트 팀을 만들어요");
   } else if (h) {
     var d = DATA[h.i], sk = snackNow()[uOf(d)];
-    tip.innerHTML = "<b>" + nameHtml(d.n) + "</b>" + (ttl(d) ? " · " + esc(ttl(d)) : "") + "<br>" + esc(job(d)) + (onLeave(d) ? "<br>" + esc(offLabel(d)) : "") + (h.seat && !h.route.length ? "<br>회의 중" : "") + (h.mode === "away" ? "<br>" + (h.tag === "lunch" ? "점심 중" : "휴식 중") : "") + (openTasks(d).length ? "<br>맡은 업무 " + openTasks(d).length + "건" : "") + (sk ? "<br>간식 당번 · " + esc(sk.items.join(", ")) : "");
+    tip.innerHTML = "<b>" + nameHtml(d.n) + "</b>" + (ttl(d) ? " · " + esc(ttl(d)) : "") + "<br>" + esc(job(d)) + (onLeave(d) ? "<br>" + esc(offLabel(d)) : "") + (h.seat && !h.route.length ? "<br>회의 중" : "") + (h.mode === "away" ? "<br>" + (h.tag === "lunch" ? (WORLD_THEME === "space" ? "우주식량 중" : "점심 중") : "휴식 중") : "") + (openTasks(d).length ? "<br>맡은 업무 " + openTasks(d).length + "건" : "") + (sk ? "<br>간식 당번 · " + esc(sk.items.join(", ")) : "");
   } else if (hi) {
     var pi = indexOfId(hi.pid);
     tip.innerHTML = "<b>침입자</b> · " + esc(hi.text) + "<br>담당 " + (pi >= 0 ? esc(DATA[pi].n) : "") + " · 누르면 업무 목록이 열려요";
@@ -1763,7 +1776,16 @@ document.getElementById("meetpane").addEventListener("click", function (e) {
 document.getElementById("mname").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); document.getElementById("msave").click(); } });
 
 /* ---- 프로젝트 화면 ---- */
-var renaming = {}, pArm = "";
+var renaming = {}, pArm = "", pNewHeroes = {};
+function renderProjectHeroPick() {
+  var box = document.getElementById("project-hero-pick");
+  if (!box) return;
+  var heroes = DATA.filter(function (d) { return !d.ext; });
+  box.innerHTML = heroes.map(function (d) {
+    var id = jobId(d);
+    return '<button type="button" class="pk" data-hero-id="' + esc(id) + '" aria-pressed="' + !!pNewHeroes[id] + '">' + esc(d.n) + '</button>';
+  }).join("") || '<span class="tempty">아직 등록된 영웅이 없습니다.</span>';
+}
 function keepForm(root, fn) {
   var vals = {}, act = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.k : null, els = root.querySelectorAll("[data-k]"), k;
   for (k = 0; k < els.length; k++) vals[els[k].dataset.k] = els[k].value;
@@ -1775,6 +1797,7 @@ function keepForm(root, fn) {
 function renderProjects() {
   var root = document.getElementById("plist"), can = canManageSharedOperations();
   refreshForms();
+  renderProjectHeroPick();
   keepForm(root, function () {
     var h = "";
     PSLOTS.forEach(function (k) {
@@ -1818,11 +1841,19 @@ function createProject() {
   PSLOTS.forEach(function (k) { if (!slot && !store.projects[k]) slot = k; });
   if (!n) { st.textContent = "프로젝트 이름을 적어주세요."; return; }
   if (!slot) { st.textContent = "프로젝트 팀은 3개까지 만들 수 있어요. 끝난 팀을 삭제하면 자리가 생겨요."; return; }
-  commit("projects", slot, { name: n, members: [] }, function () { inp.value = ""; st.textContent = ""; afterProjects(); }, "#pstatus");
+  var members = Object.keys(pNewHeroes).map(function (id) {
+    return DATA.filter(function (d) { return jobId(d) === id; })[0];
+  }).filter(Boolean).map(function (d) { return { id: d.id, n: d.n, t: ttl(d), g: d.g }; });
+  commit("projects", slot, { name: n, members: members }, function () { inp.value = ""; pNewHeroes = {}; st.textContent = ""; afterProjects(); }, "#pstatus");
 }
 document.getElementById("projpane").addEventListener("click", function (e) {
   var b, st = document.getElementById("pstatus");
   if (e.target.closest("#padd")) { createProject(); return; }
+  if ((b = e.target.closest("[data-hero-id]"))) {
+    if (pNewHeroes[b.dataset.heroId]) delete pNewHeroes[b.dataset.heroId]; else pNewHeroes[b.dataset.heroId] = true;
+    b.setAttribute("aria-pressed", String(!!pNewHeroes[b.dataset.heroId]));
+    return;
+  }
   if ((b = e.target.closest(".prename"))) { renaming[b.dataset.p] = true; renderProjects(); var ri = document.querySelector('[data-k="rn:' + b.dataset.p + '"]'); if (ri) { ri.focus(); ri.select(); } return; }
   if ((b = e.target.closest(".prencancel"))) { delete renaming[b.dataset.p]; renderProjects(); return; }
   if ((b = e.target.closest(".prensave"))) { renameProject(b.dataset.p); return; }
