@@ -444,7 +444,10 @@ function seatEditor(d) {
   var cur = deskFor(d), occ = {}, h = "";
   DATA.forEach(function (m) { var sd = deskFor(m); if (sd) occ[sd.idx] = m; });
   SEATS.forEach(function (s) {
-    if (s.kind !== "person") return;
+    if (s.kind !== "person") {
+      h += '<button type="button" class="sw pc" disabled aria-label="PC 전용 자리 ' + esc(s.n) + '"><span>PC</span><b>' + esc(s.n) + "</b></button>";
+      return;
+    }
     var o = occ[s.idx], isCur = !!cur && s.idx === cur.idx;
     var pos = (s.row + 1) + "-" + (s.col + 1), spoken = (s.row + 1) + "행 " + (s.col + 1) + "열";
     h += '<button type="button" class="sw' + (isCur ? " cur" : "") + (o ? " occupied" : " vac") + '" data-s="' + s.idx + '"' + (isCur || o ? " disabled" : "") + ' title="' + spoken + '" aria-label="' + (isCur ? "내 좌석, " : o ? "사용 중, " : "빈 자리, ") + spoken + '">' + (isCur ? "내 자리 " : o ? "점유 " : "") + pos + "</button>";
@@ -461,6 +464,7 @@ function saveSeat(i, tIdx) {
     if (status) status.textContent = "이미 다른 캐릭터가 선택한 자리예요.";
     return;
   }
+  if (target && WORLD_THEME === "office" && !window.confirm((target.row + 1) + "행 " + (target.col + 1) + "열 자리를 지정하시겠습니까?")) return;
   Object.keys(src).forEach(function (k) { ov[k] = src[k]; });
   if (target) ov[jobId(d)] = target.idx; else delete ov[jobId(d)];
   commit("seats", "main", Object.keys(ov).length ? { m: ov } : null, function () { applySeats(false); syncIntruders(false); openSheet(i, null); }, "#seatpanel .jstatus");
