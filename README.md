@@ -37,7 +37,7 @@ HTML, CSS, JavaScript 정적 화면과 REST API를 하나의 서버에서 제공
 
 | 영역 | 기술 |
 |---|---|
-| 서버 | Java 21, Spring Boot 3.3.5, Spring Web, Spring Security |
+| 서버 | Java 25, Spring Boot 3.3.5, Spring Web, Spring Security |
 | 데이터 접근 | MyBatis 3.0.3 |
 | 기본 DB | H2 파일 데이터베이스 |
 | 배포용 DB 드라이버 | PostgreSQL JDBC |
@@ -48,7 +48,7 @@ HTML, CSS, JavaScript 정적 화면과 REST API를 하나의 서버에서 제공
 
 ### 준비
 
-- JDK 21
+- JDK 25
 - Maven
 
 ### 실행 명령
