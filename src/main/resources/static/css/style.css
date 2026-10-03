@@ -228,7 +228,7 @@ h1 em { font-style: normal; color: var(--gold); }
 .sw:disabled { cursor: default; }
 .sw.cur { border-color: var(--gold) !important; color: var(--gold); }
 .sw.vac { border-style: dashed; color: var(--muted); }
-#seatpanel .recs { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); max-height: 260px; overflow-y: auto; }
+#seatpanel .recs { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); max-height: 260px; overflow-y: auto; }
 #seatpanel .recs button { min-width: 0; padding-inline: 2px; font-size: 11px; white-space: nowrap; }
 #seatpanel .sw.occupied:disabled { opacity: .58; text-decoration: line-through; }
 #seatpanel .sw.pc { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; background: var(--bg); border-style: solid; font-size: 9px; }
@@ -547,7 +547,7 @@ h1 { margin: 12px 0 8px; font-size: 56px; line-height: 1.08; letter-spacing: 0; 
 .private-chat { max-width: 1120px; }
 .mchip { border-radius: 6px; }
 @media (max-width: 640px) {
-  #seatpanel .recs { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  #seatpanel .recs { grid-template-columns: repeat(8, minmax(0, 1fr)); }
   .screen-switch { right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); min-height: 40px; padding-inline: 11px; }
 }
 .private-room { border-radius: 6px; }

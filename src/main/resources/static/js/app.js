@@ -463,6 +463,17 @@ function seatEditor(d) {
     '<div class="jrow"><button type="button" class="sreset">자리 비우기</button><button type="button" class="jcancel panel-close" aria-label="닫기">✕</button></div>' +
     '<div class="jstatus" role="status"></div></div>';
 }
+/* 7열 시절에 저장된 좌석 번호를 8열 번호로 옮겨요(g:8 표시가 없는 문서만) */
+function legacySeat(v) {
+  if (!v || typeof v !== "object" || v.g === GRID) return v;
+  function mv(n) { return typeof n === "number" && n >= 0 ? Math.floor(n / 7) * GRID + n % 7 : n; }
+  var o = {}, k;
+  for (k in v) o[k] = v[k];
+  if (v.m && typeof v.m === "object") { o.m = {}; for (k in v.m) o.m[k] = mv(v.m[k]); }
+  if (typeof v.s === "number") o.s = mv(v.s);
+  if (typeof v.pc === "number") o.pc = mv(v.pc);
+  return o;
+}
 function saveSeat(i, tIdx, keepSheet) {
   var d = DATA[i], cur = deskFor(d), target = typeof tIdx === "number" ? SEATS[tIdx] : null;
   if (!d || (tIdx !== null && (!target || target.kind !== "person")) || (cur && cur.idx === tIdx)) return;
@@ -473,7 +484,7 @@ function saveSeat(i, tIdx, keepSheet) {
     return;
   }
   if (target && WORLD_THEME === "office" && !window.confirm((target.row + 1) + "행 " + (target.col + 1) + "열 자리를 지정하시겠습니까?")) return;
-  commit("seats", jobId(d), { override: true, s: target ? target.idx : null, pc: null }, function () { applySeats(false); syncIntruders(false); if (keepSheet !== false) openSheet(i, null); }, "#seatpanel .jstatus");
+  commit("seats", jobId(d), { override: true, g: GRID, s: target ? target.idx : null, pc: null }, function () { applySeats(false); syncIntruders(false); if (keepSheet !== false) openSheet(i, null); }, "#seatpanel .jstatus");
 }
 function resetSeat(i) {
   if (!deskFor(DATA[i])) { hideEditor(); return; }
@@ -494,6 +505,7 @@ function setPcUse(i, seatIdx) {
   if (nextPc && WORLD_THEME === "office" && !window.confirm(nextPc.n.toUpperCase() + " 전용 PC를 잠시 사용하시겠습니까?")) return;
   commit("seats", jobId(d), {
     override: true,
+    g: GRID,
     s: assigned && assigned.kind === "person" ? assigned.idx : null,
     pc: nextPc ? nextPc.idx : null
   }, function () {
@@ -786,16 +798,17 @@ renderGrid();
 
 /* ---- world map: 실제 좌석 배치도를 따른 사무실 ---- */
 var MAP_W = 1200, MAP_H = 970, CW = 28, CH = 40, IW = 22, IH = 16;
-var OX = 40, OY = 56, CELLW = 110, ROWH = 104, LOWER_Y = 700, LANE = 690;
-var AX = OX + 3 * CELLW + CELLW / 2 - CW / 2, EDGE = 940;
+var OX = 40, OY = 62, CELLW = 110, ROWH = 74, LOWER_Y = 700, LANE = 690;
+var AX = 80 + 3.5 * 114 - CW / 2, EDGE = 940;
 var mapEl = document.getElementById("map"), mctx = mapEl.getContext("2d");
 mctx.imageSmoothingEnabled = false;
 var reduceMotion = !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
 var SEATS = [], SEATBY = {};
-for (var row = 0; row < 7; row++) for (var col = 0; col < 7; col++) {
-  var idx = row * 7 + col, cx = 100 + col * 120, ry = 62 + row * 85;
-  var kind = idx === 7 || idx === 8 ? "pc" : "person", nm = idx === 7 ? "ftp" : idx === 8 ? "ER" : "";
+var GRID = 8;
+for (var row = 0; row < GRID; row++) for (var col = 0; col < GRID; col++) {
+  var idx = row * GRID + col, cx = 80 + col * 114, ry = 62 + row * ROWH;
+  var kind = idx === 8 || idx === 9 ? "pc" : "person", nm = idx === 8 ? "ftp" : idx === 9 ? "ER" : "";
   var s = { idx: idx, cx: cx, ry: ry, x: cx - CW / 2, y: ry + 6, kind: kind, n: nm, col: col, row: row };
   SEATS.push(s);
 }
@@ -1039,10 +1052,10 @@ function paintOfficeMap(c) {
     c.fillStyle = "#5b8586"; c.fillRect(x + 3, 22, 88, 14);
     c.fillStyle = "#d7e5d9"; c.globalAlpha = 0.24; c.fillRect(x + 6, 23, 37, 2); c.globalAlpha = 1;
   }
-  c.fillStyle = "#282522"; c.fillRect(30, 48, 900, 606);
-  c.fillStyle = "#45403b"; c.fillRect(34, 52, 892, 598);
+  c.fillStyle = "#282522"; c.fillRect(30, 48, 900, 618);
+  c.fillStyle = "#45403b"; c.fillRect(34, 52, 892, 610);
   c.fillStyle = "#403a35"; c.globalAlpha = 0.65;
-  for (x = 34; x < 926; x += 60) c.fillRect(x, 52, 1, 598);
+  for (x = 34; x < 926; x += 60) c.fillRect(x, 52, 1, 610);
   c.globalAlpha = 1;
   c.fillStyle = "#282522";
   SEATS.forEach(function (s) {
@@ -1374,7 +1387,7 @@ function homeDest(w) { return w.hd && shouldSitAtDesk(DATA[w.i]) ? [w.hd.x, w.hd
 function leaveSpot(w) { return w.hd ? [w.hd.cx - CW / 2, w.hd.ry + 66] : (STAND[DATA[w.i].n] || [w.x, w.y]); }
 function isSitting(w) { return !w.route.length && !w.seat && w.mode === "desk" && w.hd && shouldSitAtDesk(DATA[w.i]) && Math.abs(w.x - w.hd.x) < 1.5 && Math.abs(w.y - w.hd.y) < 1.5; }
 function isUsingPc(w) { return w.mode === "pc" && !!w.pc && !w.route.length; }
-function rowOfY(y) { return Math.max(0, Math.min(5, Math.floor((y - OY) / ROWH))); }
+function rowOfY(y) { return Math.max(0, Math.min(GRID - 1, Math.floor((y - OY) / ROWH))); }
 function wtop(r) { return OY + r * ROWH + 66; }
 function zoneOf(x, y) { return x >= EDGE - 10 ? "meet" : (y >= LOWER_Y ? "low" : "off"); }
 function goTo(w, dest) {
@@ -1399,7 +1412,7 @@ function lunchSpot(k, n) {
   var rx = Math.min(150, 46 + n * 9), ry = rx * 0.55, a = 2 * Math.PI * k / n - Math.PI / 2;
   return [LUNCH.cx + Math.cos(a) * rx - CW / 2, LUNCH.cy + Math.sin(a) * ry - CH + 14];
 }
-function awayDest() { return [OX + Math.random() * (8 * CELLW - CW), wtop(Math.floor(Math.random() * 6))]; }
+function awayDest() { return [OX + Math.random() * (8 * CELLW - CW), wtop(Math.floor(Math.random() * GRID))]; }
 function jump(w, p) { w.x = p[0]; w.y = p[1]; w.tx = w.x; w.ty = w.y; w.route = []; w.moving = false; w.wait = Math.random() * 2; }
 function applyMoves(initial) {
   walkers.forEach(function (w) {
@@ -2556,7 +2569,7 @@ var COPY_DEFAULTS = {
   ledeBattlefield: "프론트와 백오피스, 두 개의 차원에서 {count}명의 영웅이 전장을 지킵니다.",
   ledeSpace: "프론트와 백오피스, 두 개의 차원에서 {count}명의 승무원이 우주를 지킵니다.",
   ledeSecond: "차원과 유니버스를 고르거나 이름과 스킬로 검색해서 동료를 만나보세요.",
-  mapOffice: "49개 자리 중 47개는 직원 좌석이고, FTP·ER 전용 PC 2개는 잠시 사용할 수 있어요. PC 사용 중에도 지정 좌석과 닉네임은 유지됩니다. 본인 좌석을 클릭하면 돌아갑니다.",
+  mapOffice: "64개 자리 중 62개는 직원 좌석이고, FTP·ER 전용 PC 2개는 잠시 사용할 수 있어요. PC 사용 중에도 지정 좌석과 닉네임은 유지됩니다. 본인 좌석을 클릭하면 돌아갑니다.",
   mapBattlefield: "영웅은 상태와 회의에 따라 전장과 각 유니버스를 오갑니다. 캐릭터 시트에서 상태·근태·업무를 관리하고, 회의가 끝나면 원래 활동 구역으로 돌아갑니다.",
   mapSpace: "승무원은 상태와 회의에 따라 우주 기지와 각 유니버스를 오갑니다. 캐릭터 시트에서 상태·근태·업무를 관리하고, 회의가 끝나면 원래 활동 구역으로 돌아갑니다.",
   teamOffice: "계정 캐릭터는 회원가입 후 본인이 만들거나 관리자가 계정에 연결합니다. 이 화면에서 추가하는 명단 전용 직원은 지도와 명단에 표시됩니다. 닉네임과 대분류는 필수이며, 소분류·직급·직업은 선택 사항입니다. 명단 직원의 추가·제거와 계정 캐릭터 연결·삭제는 관리자만 할 수 있습니다.",
@@ -2751,7 +2764,7 @@ if (window.claude && window.claude.use) {
     db.collection("seats").onSnapshot(function (snap) {
       var m = {};
       snap.docs.forEach(function (x) {
-        var v = x.data();
+        var v = legacySeat(x.data());
         if (v && v.m && typeof v.m === "object") m[x.id] = { m: v.m };
         else if (v && v.override === true && (v.s === null || typeof v.s === "number" && v.s >= 0 && v.s < SEATS.length && Math.floor(v.s) === v.s) && (v.pc == null || typeof v.pc === "number" && v.pc >= 0 && v.pc < SEATS.length && Math.floor(v.pc) === v.pc && SEATS[v.pc].kind === "pc")) m[x.id] = { override: true, s: v.s, pc: typeof v.pc === "number" ? v.pc : null };
       });
